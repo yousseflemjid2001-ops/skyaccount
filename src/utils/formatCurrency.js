@@ -1,4 +1,4 @@
-export const formatCurrency = (amount, currency = 'EGP') => {
+export const formatCurrency = (amount, currency = 'DA') => {
     if (amount === null || amount === undefined || amount === '') return '';
     const num = typeof amount === 'string' ? parseFloat(amount.replace(/[^0-9.-]+/g, '')) : amount;
     if (isNaN(num)) return amount; // Fallback if parsing fails

@@ -5,8 +5,15 @@ import {
     Users,
     Package,
     TrendingUp,
+    TrendingDown,
     Settings,
+    Briefcase,
+    Building,
+    Layers,
+
+
     LogOut,
+    Lock,
     Plus,
     Search,
     Bell,
@@ -23,7 +30,7 @@ import {
     Printer,
     ChevronLeft,
     Wallet,
-    Briefcase,
+
     ShoppingCart,
     CreditCard,
     History,
@@ -32,7 +39,9 @@ import {
     Eye,
     Trash2,
     BarChart2,
-    AlertTriangle
+    AlertTriangle,
+    ShoppingBag,
+    BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -58,24 +67,22 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, isRtl, index }) => (
         initial={{ opacity: 0, x: isRtl ? 20 : -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: index * 0.05 }}
-        whileHover={{ x: isRtl ? -4 : 4 }}
+        whileHover={{ scale: 1.02, backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
         whileTap={{ scale: 0.98 }}
         onClick={onClick}
-        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 ${active
-            ? 'sidebar-active shadow-lg'
-            : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
+        className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 ${active ? 'sidebar-active' : ''}`}
         style={{
-            marginBottom: '4px',
+            marginBottom: '8px',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
             padding: '12px 16px',
-            borderRadius: '12px'
+            borderRadius: '12px',
+            color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
         }}
     >
-        <Icon size={20} />
-        <span className="font-medium" style={{ fontSize: '13px' }}>{label}</span>
+        <Icon size={20} color={active ? 'var(--accent-primary)' : 'var(--text-secondary)'} />
+        <span className="font-medium" style={{ fontSize: '14px', fontWeight: active ? '700' : '500' }}>{label}</span>
     </motion.div>
 );
 
@@ -135,26 +142,39 @@ const FormInput = ({ label, value, onChange, placeholder, type = "text", isRtl, 
 
 // --- Sections ---
 
-const Sidebar = ({ activeTab, setActiveTab, t, isRtl }) => {
+const Sidebar = ({ activeTab, setActiveTab, t, isRtl, onLogout }) => {
     const menuItems = [
         { id: 'dashboard', icon: LayoutDashboard, label: t.dashboard },
-        { id: 'sales', icon: FileText, label: t.sales },
-        { id: 'purchases', icon: ShoppingCart, label: t.purchases },
+        { id: 'sales', icon: ShoppingCart, label: t.sales },
+        { id: 'purchases', icon: ShoppingBag, label: t.purchases },
         { id: 'inventory', icon: Package, label: t.inventory },
         { id: 'customers', icon: Users, label: t.customersSuppliers },
         { id: 'treasury', icon: Wallet, label: t.treasury },
-        { id: 'chart', icon: Briefcase, label: t.chartOfAccounts },
-        { id: 'reports', icon: TrendingUp, label: t.reports },
+        { id: 'chart', icon: BookOpen, label: t.chartOfAccounts },
+        { id: 'reports', icon: FileText, label: t.reports },
         { id: 'settings', icon: Settings, label: t.settings },
     ];
 
     return (
-        <div className="glass" style={{ width: '260px', height: 'calc(100vh - 32px)', margin: '16px', display: 'flex', flexDirection: 'column', padding: '24px', zIndex: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #38bdf8, #818cf8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Briefcase color="white" size={20} />
+        <div className="glass" style={{
+            width: '280px',
+            height: 'calc(100vh - 32px)',
+            margin: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '24px',
+            zIndex: 10,
+            boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+            direction: isRtl ? 'rtl' : 'ltr'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px', padding: '0 12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)' }}>
+                    <Layers size={24} color="white" />
                 </div>
-                <h1 style={{ fontSize: '18px', fontWeight: '800' }}>{t.appName}</h1>
+                <div>
+                    <h1 style={{ fontSize: '20px', fontWeight: '800', letterSpacing: '-0.5px' }}>{t.appName}</h1>
+                    <p style={{ fontSize: '11px', color: '#94a3b8' }}>v2.4.0 (Enterprise)</p>
+                </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -167,15 +187,21 @@ const Sidebar = ({ activeTab, setActiveTab, t, isRtl }) => {
                         active={activeTab === item.id}
                         onClick={() => {
                             setActiveTab(item.id);
-                            if (item.id === 'sales') setSalesView('list');
                         }}
                         isRtl={isRtl}
                     />
                 ))}
             </div>
 
-            <div style={{ marginTop: '20px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <SidebarItem icon={LogOut} label={t.logout} onClick={() => window.location.reload()} isRtl={isRtl} index={10} />
+            <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                <SidebarItem
+                    icon={LogOut}
+                    label={t.logout}
+                    active={false}
+                    onClick={onLogout}
+                    isRtl={isRtl}
+                    index={10}
+                />
             </div>
         </div>
     );
@@ -700,8 +726,6 @@ const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdi
                 }))}
                 t={t}
                 isRtl={isRtl}
-                t={t}
-                isRtl={isRtl}
                 onDelete={onDelete}
                 onView={onEdit}
             />
@@ -710,23 +734,180 @@ const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdi
 };
 
 const ChartOfAccountsView = ({ t, isRtl, onAdd, accounts, onDelete }) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeFilter, setActiveFilter] = useState('All');
+
+    // Stats for cards
+    const stats = useMemo(() => {
+        const calculateTotal = (type) => accounts
+            .filter(a => a.type === type && !a.parent)
+            .reduce((sum, acc) => sum + parseFloat(acc.balance || 0), 0);
+
+        return [
+            { id: 'assets', label: t.assets || 'Assets', value: calculateTotal('Asset'), color: '#38bdf8', bgColor: 'rgba(56, 189, 248, 0.1)', icon: Briefcase },
+            { id: 'liabilities', label: t.liabilities || 'Liabilities', value: calculateTotal('Liability'), color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', icon: Building }, // Assuming Building icon for now or similar
+            { id: 'equity', label: t.equity || 'Equity', value: calculateTotal('Equity'), color: '#c084fc', bgColor: 'rgba(192, 132, 252, 0.1)', icon: Layers }, // Assuming Layers
+            { id: 'revenue', label: t.revenue || 'Revenue', value: calculateTotal('Revenue'), color: '#22c55e', bgColor: 'rgba(34, 197, 94, 0.1)', icon: TrendingUp },
+            { id: 'expenses', label: t.expenses || 'Expenses', value: calculateTotal('Expense'), color: '#f59e0b', bgColor: 'rgba(245, 158, 11, 0.1)', icon: TrendingDown }, // Assuming TrendingDown
+        ];
+    }, [accounts, t]);
+
+    const filteredAccounts = accounts.filter(acc => {
+        const matchesSearch = (acc.name.toLowerCase().includes(searchTerm.toLowerCase()) || acc.code.includes(searchTerm));
+        const matchesFilter = activeFilter === 'All' || acc.type === activeFilter;
+        return matchesSearch && matchesFilter;
+    });
+
+    const getNature = (type) => {
+        return (type === 'Asset' || type === 'Expense') ? (t.debit || 'Debit') : (t.credit || 'Credit');
+    };
+
+    const getNatureColor = (type) => {
+        return (type === 'Asset' || type === 'Expense') ? '#38bdf8' : '#ef4444';
+    };
+
+    const getTypeBadRequest = (type) => {
+        if (type === 'Asset') return { bg: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8' };
+        if (type === 'Liability') return { bg: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' };
+        if (type === 'Equity') return { bg: 'rgba(192, 132, 252, 0.1)', color: '#c084fc' };
+        if (type === 'Revenue') return { bg: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' };
+        if (type === 'Expense') return { bg: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' };
+        return { bg: 'rgba(148, 163, 184, 0.1)', color: '#94a3b8' };
+    };
+
     return (
-        <TableView
-            title={t.chartOfAccounts}
-            subtitle="Structure financière et plan comptable de l'entreprise"
-            buttonLabel={t.addAccount}
-            onAdd={onAdd}
-            headers={[t.accountCode, t.accountName, t.accountType, t.balance]}
-            data={accounts.map(acc => ({
-                code: acc.code,
-                name: acc.parent ? (isRtl ? `__ ${acc.name}` : `\u00A0\u00A0\u00A0\u00A0${acc.name}`) : acc.name, // Indent children
-                type: acc.type,
-                balance: `EGP ${parseInt(acc.balance).toLocaleString()}`
-            }))}
-            t={t}
-            isRtl={isRtl}
-            onDelete={onDelete}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h2 style={{ fontSize: '28px', fontWeight: '800', color: 'white' }}>{t.chartOfAccounts}</h2>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>{t.manageChartOfAccounts || 'Manage your financial structure'}</p>
+                </div>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    onClick={onAdd}
+                    style={{ background: '#1d4ed8', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 20px rgba(29, 78, 216, 0.3)' }}
+                >
+                    <Plus size={20} /> {t.addAccount}
+                </motion.button>
+            </div>
+
+            {/* Summary Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+                {stats.map((stat, index) => (
+                    <motion.div
+                        key={stat.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="glass"
+                        style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: stat.bgColor, border: `1px solid ${stat.color}30` }}
+                    >
+                        <div>
+                            <p style={{ fontSize: '14px', fontWeight: '600', color: stat.color, marginBottom: '8px' }}>{stat.label}</p>
+                            <h3 style={{ fontSize: '20px', fontWeight: '800', color: stat.color }}>{formatCurrency(stat.value)}</h3>
+                        </div>
+                        <stat.icon size={24} color={stat.color} style={{ opacity: 0.8 }} />
+                    </motion.div>
+                ))}
+            </div>
+
+            {/* Filters & Table */}
+            <div className="glass" style={{ padding: '0', overflow: 'hidden' }}>
+                {/* Toolbar */}
+                <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: '20px', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        {['All', 'Asset', 'Liability', 'Equity', 'Revenue', 'Expense'].map(filter => (
+                            <button
+                                key={filter}
+                                onClick={() => setActiveFilter(filter)}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: activeFilter === filter ? 'white' : 'transparent',
+                                    color: activeFilter === filter ? '#0f172a' : '#94a3b8',
+                                    fontWeight: activeFilter === filter ? '700' : '500',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {t[filter.toLowerCase()] || filter}
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{ position: 'relative', width: '300px' }}>
+                        <Search size={18} color="#94a3b8" style={{ position: 'absolute', top: '50%', [isRtl ? 'right' : 'left']: '12px', transform: 'translateY(-50%)' }} />
+                        <input
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder={t.searchPlaceholder || "Search..."}
+                            style={{
+                                width: '100%',
+                                background: 'rgba(255,255,255,0.05)',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                padding: isRtl ? '10px 40px 10px 12px' : '10px 12px 10px 40px',
+                                borderRadius: '10px',
+                                color: 'white',
+                                outline: 'none'
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
+                    <thead style={{ background: 'rgba(255,255,255,0.02)', color: '#94a3b8', fontSize: '13px' }}>
+                        <tr>
+                            <th style={{ padding: '16px 24px', fontWeight: '600' }}>{t.accountName}</th>
+                            <th style={{ padding: '16px 24px', fontWeight: '600' }}>{t.code || 'Code'}</th>
+                            <th style={{ padding: '16px 24px', fontWeight: '600' }}>{t.accountType}</th>
+                            <th style={{ padding: '16px 24px', fontWeight: '600' }}>{t.nature || 'Nature'}</th>
+                            <th style={{ padding: '16px 24px', fontWeight: '600' }}>{t.balance}</th>
+                            <th style={{ padding: '16px 24px', fontWeight: '600' }}>{t.status}</th>
+                            <th style={{ padding: '16px 24px', fontWeight: '600', textAlign: 'center' }}>{t.actions}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredAccounts.map((acc, i) => {
+                            const typeStyle = getTypeBadRequest(acc.type);
+                            return (
+                                <tr key={i} className="glass-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingRight: isRtl && acc.parent ? '20px' : '0', paddingLeft: !isRtl && acc.parent ? '20px' : '0' }}>
+                                            {!acc.parent && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: typeStyle.color }}></div>}
+                                            <span style={{ fontWeight: !acc.parent ? '700' : '400', color: 'white' }}>{acc.name}</span>
+                                        </div>
+                                    </td>
+                                    <td style={{ padding: '16px 24px', fontFamily: 'monospace', color: '#94a3b8' }}>{acc.code}</td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <span style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', background: typeStyle.bg, color: typeStyle.color }}>
+                                            {t[acc.type.toLowerCase()] || acc.type}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px 24px', color: getNatureColor(acc.type), fontWeight: '600' }}>
+                                        {getNature(acc.type)}
+                                    </td>
+                                    <td style={{ padding: '16px 24px', color: 'white', fontWeight: '700' }}>
+                                        {formatCurrency(acc.balance)}
+                                    </td>
+                                    <td style={{ padding: '16px 24px' }}>
+                                        <span style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}>
+                                            {t.activeAccount || 'Active'}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '16px 24px', textAlign: 'center' }}>
+                                        <button onClick={() => onDelete(acc)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', opacity: 0.8 }}>
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 };
 
@@ -856,9 +1037,115 @@ const CustomersSuppliersView = ({ t, isRtl, contacts, onAdd, onEdit, onDelete, o
     );
 };
 
+// --- Login View ---
+
+const LoginView = ({ t, isRtl, onLogin }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onLogin();
+    };
+
+    return (
+        <div style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+            <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="glass"
+                style={{
+                    width: '100%', maxWidth: '450px', padding: '40px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                    borderRadius: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}
+            >
+                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                    <div style={{
+                        width: '64px', height: '64px', borderRadius: '20px',
+                        background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        margin: '0 auto 24px', boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)'
+                    }}>
+                        <Layers size={32} color="white" />
+                    </div>
+                    <h1 style={{ fontSize: '28px', fontWeight: '800', marginBottom: '8px', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t.loginTitle}</h1>
+                    <p style={{ color: '#94a3b8', fontSize: '15px' }}>{t.loginSubtitle}</p>
+                </div>
+
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#cbd5e1', fontWeight: '500' }}>{t.email}</label>
+                        <div style={{ position: 'relative' }}>
+                            <Mail size={18} color="#64748b" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', [isRtl ? 'right' : 'left']: '16px' }} />
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="name@company.com"
+                                style={{
+                                    width: '100%', padding: '14px', paddingLeft: isRtl ? '14px' : '48px', paddingRight: isRtl ? '48px' : '14px',
+                                    borderRadius: '14px', background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', outline: 'none',
+                                    transition: 'all 0.3s ease'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <label style={{ fontSize: '14px', color: '#cbd5e1', fontWeight: '500' }}>{t.password}</label>
+                            <a href="#" style={{ fontSize: '13px', color: '#38bdf8', textDecoration: 'none' }}>{t.forgotPassword}</a>
+                        </div>
+                        <div style={{ position: 'relative' }}>
+                            <Lock size={18} color="#64748b" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', [isRtl ? 'right' : 'left']: '16px' }} />
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                style={{
+                                    width: '100%', padding: '14px', paddingLeft: isRtl ? '14px' : '48px', paddingRight: isRtl ? '48px' : '14px',
+                                    borderRadius: '14px', background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', outline: 'none'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+                            />
+                        </div>
+                    </div>
+
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        style={{
+                            background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+                            color: 'white', padding: '16px', borderRadius: '14px',
+                            border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer',
+                            marginTop: '10px', boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.5)'
+                        }}
+                    >
+                        {t.loginButton}
+                    </motion.button>
+                </form>
+            </motion.div>
+        </div>
+    );
+};
+
 // --- App ---
 
-const App = () => {
+const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [salesView, setSalesView] = useState('list');
     const [purchasesView, setPurchasesView] = useState('list');
@@ -866,7 +1153,7 @@ const App = () => {
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
     const [selectedContact, setSelectedContact] = useState(null);
-    const [lang, setLang] = useState('fr');
+
     const [modalType, setModalType] = useState(null);
 
     const t = translations[lang];
@@ -880,10 +1167,10 @@ const App = () => {
         { id: 'PUR-2024-101', supplier: 'Tech Supply Co', date: '2024/03/18', status: 'Payé', amount: '15,000' },
         { id: 'PUR-2024-102', supplier: 'Global Parts', date: '2024/03/22', status: 'En attente', amount: '8,400' }
     ]);
-    const [treasury, setTreasury] = useState([{ id: 'TRE-INIT-1', date: '2024-03-22', desc: 'Office Rent', type: 'Cash Out', method: 'Cash', anim: 'EGP 500.00' }]);
+    const [treasury, setTreasury] = useState([{ id: 'TRE-INIT-1', date: '2024-03-22', desc: 'Office Rent', type: 'Cash Out', method: 'Cash', anim: 'DA 500.00' }]);
     const [customers, setCustomers] = useState([
-        { name: 'John Doe', type: 'client', email: 'john@alpha.com', balance: 'EGP 1,200.00', phone: '0501234567', location: 'Riyadh' },
-        { name: 'Tech Supply Co', type: 'supplier', email: 'sales@techsupply.com', balance: '- EGP 15,000.00', phone: '0559876543', location: 'Jeddah' }
+        { name: 'John Doe', type: 'client', email: 'john@alpha.com', balance: 'DA 1,200.00', phone: '0501234567', location: 'Riyadh' },
+        { name: 'Tech Supply Co', type: 'supplier', email: 'sales@techsupply.com', balance: '- DA 15,000.00', phone: '0559876543', location: 'Jeddah' }
     ]);
     const [inventory, setInventory] = useState([
         { code: 'PRD-001', name: 'MacBook Pro M3', category: 'Laptops', stock: 12, buyPrice: '45,000', sellPrice: '52,000' },
@@ -900,12 +1187,12 @@ const App = () => {
     useEffect(() => { document.body.dir = isRtl ? 'rtl' : 'ltr'; }, [isRtl]);
 
     const handleAddSale = () => {
-        setSales([{ id: `INV-2024-${sales.length + 100}`, client: invForm.client, date: invForm.date, amount: `EGP ${invForm.amount}`, status: 'Pending' }, ...sales]);
+        setSales([{ id: `INV-2024-${sales.length + 100}`, client: invForm.client, date: invForm.date, amount: `DA ${invForm.amount}`, status: 'Pending' }, ...sales]);
         setModalType(null);
     };
 
     const handleAddPurchase = () => {
-        setPurchases([{ id: `PUR-2024-${purchases.length + 100}`, supplier: invForm.client, date: invForm.date, amount: `EGP ${invForm.amount}`, status: 'Paid' }, ...purchases]);
+        setPurchases([{ id: `PUR-2024-${purchases.length + 100}`, supplier: invForm.client, date: invForm.date, amount: `DA ${invForm.amount}`, status: 'Paid' }, ...purchases]);
         setModalType(null);
     };
 
@@ -916,7 +1203,7 @@ const App = () => {
                 desc: transForm.desc,
                 type: transForm.type === 'In' ? t.cashIn : t.cashOut,
                 method: transForm.method,
-                anim: `EGP ${transForm.amount}`,
+                anim: `DA ${transForm.amount}`,
                 accountId: transForm.accountId
             } : tr));
         } else {
@@ -926,7 +1213,7 @@ const App = () => {
                 desc: transForm.desc,
                 type: transForm.type === 'In' ? t.cashIn : t.cashOut,
                 method: transForm.method,
-                anim: `EGP ${transForm.amount}`,
+                anim: `DA ${transForm.amount}`,
                 accountId: transForm.accountId
             }, ...treasury]);
         }
@@ -943,7 +1230,7 @@ const App = () => {
             name: contactForm.name,
             type: contactForm.type,
             email: contactForm.email,
-            balance: `EGP ${contactForm.balance}`,
+            balance: `DA ${contactForm.balance}`,
             phone: contactForm.phone,
             location: contactForm.address,
             taxNumber: contactForm.taxNumber
@@ -960,7 +1247,7 @@ const App = () => {
         <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', direction: isRtl ? 'rtl' : 'ltr' }}>
             <div className="blob blob-1"></div><div className="blob blob-2"></div><div className="blob blob-3"></div>
 
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} t={t} isRtl={isRtl} />
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} t={t} isRtl={isRtl} onLogout={onLogout} />
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 <Header lang={lang} setLang={setLang} t={t} isRtl={isRtl} />
@@ -1200,24 +1487,55 @@ const App = () => {
                     </>
                 )}
                 {modalType === 'addAccount' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {/* Row 1: Code (Right) - Type (Left) [RTL assumption] */}
+                        {/* Actually in screenshot: Code is Left/Right depends on lang, let's stick to standard flow but re-order */}
+                        {/* Screenshot shows: Account Code | Account Classification */}
                         <div style={{ display: 'flex', gap: '20px' }}>
-                            <FormInput half label={t.accountCode} placeholder="1101" value={accountForm.code} onChange={v => setAccountForm({ ...accountForm, code: v })} isRtl={isRtl} />
-                            <FormInput half label={t.classification} type="select" options={[{ label: t.assets, value: 'Asset' }, { label: t.liabilities, value: 'Liability' }, { label: 'Equity', value: 'Equity' }, { label: 'Revenue', value: 'Revenue' }, { label: 'Expense', value: 'Expense' }]} value={accountForm.type} onChange={v => setAccountForm({ ...accountForm, type: v })} isRtl={isRtl} />
+                            <FormInput half label={t.accountCode} placeholder={t.codePlaceholder} value={accountForm.code} onChange={v => setAccountForm({ ...accountForm, code: v })} isRtl={isRtl} />
+                            <FormInput half label={t.classification} type="select" options={[{ label: t.assets, value: 'Asset' }, { label: t.liabilities, value: 'Liability' }, { label: t.equity, value: 'Equity' }, { label: t.revenue, value: 'Revenue' }, { label: t.expenses, value: 'Expense' }]} value={accountForm.type} onChange={v => setAccountForm({ ...accountForm, type: v })} isRtl={isRtl} />
                         </div>
-                        <FormInput label={t.accountName} value={accountForm.name} onChange={v => setAccountForm({ ...accountForm, name: v })} isRtl={isRtl} />
+
+                        {/* Row 2: Account Name */}
+                        <FormInput label={t.accountName} placeholder={t.namePlaceholder} value={accountForm.name} onChange={v => setAccountForm({ ...accountForm, name: v })} isRtl={isRtl} />
+
+                        {/* Row 3: Opening Balance | Parent Account */}
+                        {/* Screenshot: Balance | Parent */}
                         <div style={{ display: 'flex', gap: '20px' }}>
-                            <FormInput half label={t.accountFather} type="select" options={[{ label: '-- None --', value: '' }, ...accounts.map(a => ({ label: `${a.code} - ${a.name}`, value: a.code }))]} value={accountForm.parent} onChange={v => setAccountForm({ ...accountForm, parent: v })} isRtl={isRtl} />
                             <FormInput half label={t.openingBalance} placeholder="0" type="number" value={accountForm.balance} onChange={v => setAccountForm({ ...accountForm, balance: v })} isRtl={isRtl} />
+                            <FormInput half label={t.accountFather} type="select" options={[{ label: t.parentOptionDefault, value: '' }, ...accounts.map(a => ({ label: `${a.code} - ${a.name}`, value: a.code }))]} value={accountForm.parent} onChange={v => setAccountForm({ ...accountForm, parent: v })} isRtl={isRtl} />
                         </div>
-                        <FormInput label={t.description} isRtl={isRtl} />
-                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px' }}>
-                            <input type="checkbox" id="activeAccount" checked style={{ width: '18px', height: '18px' }} />
-                            <label htmlFor="activeAccount" style={{ fontSize: '14px' }}>{t.activeAccount}</label>
+
+                        {/* Row 4: Description */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <label style={{ fontSize: '13px', fontWeight: '600', color: '#94a3b8' }}>{t.description}</label>
+                            <textarea
+                                placeholder={t.descPlaceholder}
+                                className="glass"
+                                style={{
+                                    padding: '12px',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    color: 'white',
+                                    outline: 'none',
+                                    minHeight: '80px',
+                                    resize: 'none',
+                                    fontFamily: 'inherit'
+                                }}
+                            />
                         </div>
+
+                        {/* Checkbox */}
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'flex-end', marginTop: '4px', marginBottom: '12px' }}>
+                            <label htmlFor="activeAccount" style={{ fontSize: '14px', cursor: 'pointer' }}>{t.activeAccount}</label>
+                            <input type="checkbox" id="activeAccount" defaultChecked style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#38bdf8' }} />
+                        </div>
+
+                        {/* Buttons */}
                         <div style={{ display: 'flex', gap: '12px' }}>
-                            <button onClick={handleAddAccount} style={{ flex: 1, background: '#38bdf8', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer' }}>{t.save}</button>
-                            <button onClick={() => setModalType(null)} style={{ flex: 1, background: 'rgba(255,255,255,0.05)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none' }}>{t.cancel}</button>
+                            <button onClick={handleAddAccount} style={{ flex: 1, background: '#1d4ed8', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: '700', cursor: 'pointer' }}>{t.save}</button>
+                            <button onClick={() => setModalType(null)} style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', padding: '14px', borderRadius: '12px', fontWeight: '600', cursor: 'pointer' }}>{t.cancel}</button>
                         </div>
                     </div>
                 )}
@@ -1260,10 +1578,10 @@ const StatCard = ({ title, value, change, trend, icon: Icon, chartData, index })
 const DashboardView = ({ t, isRtl, onAddInvoice, invoices, customers }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
-            <StatCard index={0} title={t.totalRevenue} value="EGP 1,240,000" change="+12%" trend="up" icon={TrendingUp} />
-            <StatCard index={1} title={t.purchases} value="EGP 450,000" change="+5%" trend="down" icon={ShoppingCart} />
+            <StatCard index={0} title={t.totalRevenue} value="DA 1,240,000" change="+12%" trend="up" icon={TrendingUp} />
+            <StatCard index={1} title={t.purchases} value="DA 450,000" change="+5%" trend="down" icon={ShoppingCart} />
             <StatCard index={2} title={t.customersSuppliers} value={customers.length} change="+8%" trend="up" icon={Users} />
-            <StatCard index={3} title={t.netProfit} value="EGP 790,000" change="+15%" trend="up" icon={ArrowUpRight} />
+            <StatCard index={3} title={t.netProfit} value="DA 790,000" change="+15%" trend="up" icon={ArrowUpRight} />
         </div>
         <div className="glass" style={{ padding: '24px', height: '350px' }}>
             <h3 style={{ marginBottom: '20px' }}>{t.revenueAnalytics}</h3>
@@ -1318,7 +1636,7 @@ const AccountStatementView = ({ t, isRtl }) => {
                 </div>
                 <div className="glass" style={{ flex: 1, padding: '20px' }}>
                     <p style={{ color: '#22c55e', fontSize: '12px' }}>Current Balance (Debit)</p>
-                    <p style={{ fontWeight: '800', fontSize: '20px', color: '#22c55e' }}>93,150 EGP</p>
+                    <p style={{ fontWeight: '800', fontSize: '20px', color: '#22c55e' }}>93,150 DA</p>
                 </div>
             </div>
 
@@ -1361,59 +1679,92 @@ const AccountStatementView = ({ t, isRtl }) => {
 };
 
 const ReportsView = ({ t, isRtl }) => {
-    const [activeSubTab, setActiveSubTab] = useState('balanceSheet');
+    const [activeSubTab, setActiveSubTab] = useState('incomeStatement');
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
+                <div style={{ display: 'flex', gap: '12px', order: isRtl ? 2 : 1 }}>
+                    <button className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#94a3b8' }} onClick={() => window.print()}><Printer size={18} /> {t.printing}</button>
+                    <button onClick={() => {
+                        // PDF Generation Logic (Same as before)
+                        const title = t[activeSubTab] || "Financial Report";
+                        generateReportPDF(title, ["Item", "Amount"], [], t); // Placeholder data for now
+                    }} className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#94a3b8' }}><Download size={18} /> {t.downloadPDF}</button>
+                </div>
+
+                <div style={{ order: isRtl ? 1 : 2, textAlign: isRtl ? 'left' : 'right' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{t.financialReports}</h2>
                     <p style={{ color: '#94a3b8', fontSize: '14px' }}>Analyze your financial health</p>
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={() => {
-                        const title = t[activeSubTab] || "Financial Report";
-                        // Mock data matching the view
-                        let headers = ["Item", "Example Value"];
-                        let data = [
-                            ["Example Row 1", "10,000"],
-                            ["Example Row 2", "5,000"]
-                        ];
-
-                        // Customize based on tab (Simple implementation for now)
-                        if (activeSubTab === 'balanceSheet') {
-                            headers = [t.assets || "Assets", "Amount"];
-                            data = [
-                                [t.stock, "502,500"],
-                                [t.cash, "15,000"],
-                                ["Total Assets", "517,500"],
-                                ["", ""],
-                                [t.liabilities || "Liabilities", "Amount"],
-                                [t.customersSuppliers, "250,000"],
-                                [t.netProfit, "89,125"],
-                                ["Total Liabilities", "339,125"]
-                            ];
-                        } else if (activeSubTab === 'incomeStatement') {
-                            headers = ["Item", "Amount"];
-                            data = [
-                                [t.revenue, "93,150 EGP"],
-                                [t.costOfSales, "4,025 EGP"],
-                                [t.netProfit, "89,125 EGP"]
-                            ];
-                        }
-
-                        generateReportPDF(title, headers, data, t);
-                    }} className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#38bdf8' }}><Download size={18} /> {t.downloadPDF}</button>
-                </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+            <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', justifyContent: 'flex-end' }}>
                 {['trialBalance', 'incomeStatement', 'balanceSheet', 'salesReport', 'purchaseReport'].map(tab => (
-                    <button key={tab} onClick={() => setActiveSubTab(tab)} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', background: activeSubTab === tab ? '#38bdf8' : 'rgba(255,255,255,0.03)', color: activeSubTab === tab ? 'white' : '#94a3b8' }}>{t[tab]}</button>
+                    <button key={tab} onClick={() => setActiveSubTab(tab)} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', background: activeSubTab === tab ? '#1d4ed8' : 'rgba(255,255,255,0.03)', color: activeSubTab === tab ? 'white' : '#94a3b8' }}>{t[tab]}</button>
                 ))}
             </div>
 
+            {/* Date Filters */}
+            <div className="glass" style={{ padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>From Date</span>
+                    <input type="date" className="glass" style={{ padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', background: 'transparent' }} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>To Date</span>
+                    <input type="date" className="glass" style={{ padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', background: 'transparent' }} />
+                </div>
+            </div>
+
             <div className="glass" style={{ padding: '24px' }}>
+                {activeSubTab === 'incomeStatement' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}><TrendingUp size={20} color="#38bdf8" /> {t.incomeStatement}</h3>
+                        </div>
+
+                        {/* 1. Total Sales */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#dcfce7', borderRadius: '8px', alignItems: 'center' }}>
+                            <span style={{ color: '#166534', fontWeight: '700', fontSize: '14px' }}>{t.revenue}</span>
+                            <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
+                                <strong style={{ fontSize: '24px', color: '#166534', display: 'block' }}>93,150 DA</strong>
+                            </div>
+                        </div>
+
+                        {/* 2. Cost of Sales */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#fee2e2', borderRadius: '8px', alignItems: 'center' }}>
+                            <span style={{ color: '#991b1b', fontWeight: '700', fontSize: '14px' }}>{t.costOfSales}</span>
+                            <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
+                                <strong style={{ fontSize: '24px', color: '#991b1b', display: 'block' }}>4,025 DA</strong>
+                            </div>
+                        </div>
+
+                        {/* 3. Gross Profit */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#e0f2fe', borderRadius: '8px', alignItems: 'center' }}>
+                            <span style={{ color: '#075985', fontWeight: '700', fontSize: '14px' }}>{t.grossProfit || "Gross Profit"}</span>
+                            <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
+                                <strong style={{ fontSize: '24px', color: '#075985', display: 'block' }}>89,125 DA</strong>
+                            </div>
+                        </div>
+
+                        {/* 4. Operating Expenses */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#ffedd5', borderRadius: '8px', alignItems: 'center' }}>
+                            <span style={{ color: '#9a3412', fontWeight: '700', fontSize: '14px' }}>{t.operatingExpenses || "Operating Expenses (-)"}</span>
+                            <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
+                                <strong style={{ fontSize: '24px', color: '#9a3412', display: 'block' }}>0 DA</strong>
+                            </div>
+                        </div>
+
+                        {/* 5. Net Profit */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#dcfce7', borderRadius: '8px', alignItems: 'center', marginTop: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+                            <span style={{ color: '#15803d', fontWeight: '800', fontSize: '16px' }}>{t.netProfit}</span>
+                            <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
+                                <strong style={{ fontSize: '28px', color: '#15803d', display: 'block' }}>89,125 DA</strong>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {activeSubTab === 'balanceSheet' && (
                     <div style={{ display: 'flex', gap: '40px' }}>
                         <div style={{ flex: 1 }}>
@@ -1428,13 +1779,6 @@ const ReportsView = ({ t, isRtl }) => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.netProfit}</span><span style={{ fontWeight: '700', color: '#22c55e' }}>89,125</span></div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', marginTop: '16px' }}><strong>{t.totalLiabilities}</strong><strong>339,125</strong></div>
                         </div>
-                    </div>
-                )}
-                {activeSubTab === 'incomeStatement' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: 'rgba(34, 197, 94, 0.1)', borderRadius: '12px' }}><span>{t.revenue}</span><strong style={{ fontSize: '20px', color: '#22c55e' }}>93,150 EGP</strong></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: '12px' }}><span>{t.costOfSales}</span><strong style={{ fontSize: '20px', color: '#ef4444' }}>4,025 EGP</strong></div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '12px' }}><span>{t.netProfit}</span><strong style={{ fontSize: '20px', color: '#38bdf8' }}>89,125 EGP</strong></div>
                     </div>
                 )}
             </div>
@@ -1455,7 +1799,7 @@ const SettingsView = ({ t, isRtl }) => {
                 <FormInput label="Company Name" value="Ilyas Accountant" onChange={() => { }} isRtl={isRtl} />
                 <FormInput label="Email" value="admin@ilyas.com" onChange={() => { }} isRtl={isRtl} />
                 <div style={{ display: 'flex', gap: '20px' }}>
-                    <FormInput half label="Currency" value="EGP" onChange={() => { }} isRtl={isRtl} />
+                    <FormInput half label="Currency" value="DA" onChange={() => { }} isRtl={isRtl} />
                     <FormInput half label="Language" type="select" options={[{ label: 'English', value: 'en' }, { label: 'Français', value: 'fr' }, { label: 'العربية', value: 'ar' }]} isRtl={isRtl} />
                 </div>
                 <button className="glass sidebar-active" style={{ padding: '12px 24px', border: 'none', cursor: 'pointer', fontWeight: '700', marginTop: '12px' }}>{t.save}</button>
@@ -1465,5 +1809,24 @@ const SettingsView = ({ t, isRtl }) => {
 };
 
 // --- End of App ---
+
+const App = () => {
+    const [lang, setLang] = useState('fr');
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+    const t = translations[lang];
+    const isRtl = lang === 'ar';
+
+    useEffect(() => {
+        document.body.dir = isRtl ? 'rtl' : 'ltr';
+        document.body.style.fontFamily = lang === 'ar' ? "'Cairo', sans-serif" : "'Inter', sans-serif";
+    }, [lang, isRtl]);
+
+    if (!isLoggedIn) {
+        return <LoginView t={t} isRtl={isRtl} onLogin={() => setIsLoggedIn(true)} />;
+    }
+
+    return <AuthenticatedApp lang={lang} setLang={setLang} onLogout={() => setIsLoggedIn(false)} />;
+};
 
 export default App;
