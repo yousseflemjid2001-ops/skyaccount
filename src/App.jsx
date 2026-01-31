@@ -41,7 +41,10 @@ import {
     BarChart2,
     AlertTriangle,
     ShoppingBag,
-    BookOpen
+    BookOpen,
+    Pencil,
+    Shield,
+    Calendar
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -55,10 +58,15 @@ import {
     LineChart,
     Line,
 } from 'recharts';
-import translations from './translations';
-import { generateInvoicePDF, generateReportPDF } from './utils/pdfUtils';
-import { initialAccounts } from './data/initialAccounts';
-import { formatCurrency } from './utils/formatCurrency';
+import translations from './translations.js';
+import { generateInvoicePDF, generateReportPDF } from './utils/pdfUtils.js';
+import { initialAccounts } from './data/initialAccounts.js';
+import { formatCurrency } from './utils/formatCurrency.js';
+import SalesInvoiceView from './components/SalesInvoiceView';
+import PurchaseInvoiceView from './components/PurchaseInvoiceView';
+import FormInput from './components/FormInput';
+import useLocalStorage from './hooks/useLocalStorage'; // Deprecated for Supabase
+import { api } from './services/api';
 
 // --- Reusable Components ---
 
@@ -115,30 +123,7 @@ const Modal = ({ isOpen, onClose, title, children, isRtl }) => (
     </AnimatePresence>
 );
 
-const FormInput = ({ label, value, onChange, placeholder, type = "text", isRtl, half, options }) => (
-    <div style={{ marginBottom: '20px', flex: half ? '1' : 'none' }}>
-        <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#94a3b8', marginBottom: '8px' }}>{label}</label>
-        {type === 'select' ? (
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="glass"
-                style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', outline: 'none', appearance: 'none' }}
-            >
-                {options.map(opt => <option key={opt.value} value={opt.value} style={{ background: '#1e293b' }}>{opt.label}</option>)}
-            </select>
-        ) : (
-            <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                className="glass"
-                style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'white', outline: 'none', textAlign: isRtl ? 'right' : 'left', fontSize: '14px' }}
-            />
-        )}
-    </div>
-);
+
 
 // --- Sections ---
 
@@ -209,8 +194,18 @@ const Sidebar = ({ activeTab, setActiveTab, t, isRtl, onLogout }) => {
 
 // --- View Implementation ---
 
-const TableView = ({ title, subtitle, buttonLabel, onAdd, headers, data, t, isRtl, onExport, searchPlaceholder, onView, onDelete }) => {
+const TableView = ({ title, subtitle, buttonLabel, onAdd, headers = [], data = [], t, isRtl, onExport, searchPlaceholder, onView, onDelete, onEdit, onPrint, dateRange, setDateRange }) => {
     const [searchTerm, setSearchTerm] = useState('');
+
+    const safeData = Array.isArray(data) ? data : [];
+    const safeHeaders = Array.isArray(headers) ? headers : [];
+
+    const filteredData = safeData.filter(row => {
+        if (!row) return false;
+        return Object.values(row).some(val =>
+            String(val || '').toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    });
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -228,31 +223,61 @@ const TableView = ({ title, subtitle, buttonLabel, onAdd, headers, data, t, isRt
                 </motion.button>
             </div>
 
-            <div className="glass" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.02)' }}>
-                <Search size={18} color="#94a3b8" />
-                <input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={searchPlaceholder || t.searchBy}
-                    style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%', fontSize: '14px' }}
-                />
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div className="glass" style={{ flex: 1, padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.02)' }}>
+                    <Search size={18} color="#94a3b8" />
+                    <input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder={searchPlaceholder || t?.searchBy || "Search..."}
+                        style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%', fontSize: '14px' }}
+                    />
+                </div>
+
+                {dateRange && setDateRange && (
+                    <div className="glass" style={{ display: 'flex', gap: '15px', padding: '10px 20px', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8' }}>
+                            <Calendar size={16} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>{t.fromDate}:</span>
+                                <input
+                                    type="date"
+                                    value={dateRange.start}
+                                    onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                                    style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', outline: 'none' }}
+                                />
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>{t.toDate}:</span>
+                                <input
+                                    type="date"
+                                    value={dateRange.end}
+                                    onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                                    style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', outline: 'none' }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="glass" style={{ overflow: 'hidden', padding: '0' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
                     <thead style={{ background: 'rgba(255,255,255,0.02)', color: '#94a3b8', fontSize: '13px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <tr>
-                            {headers.map((h, i) => <th key={i} style={{ padding: '16px 24px', fontWeight: '600' }}>{h}</th>)}
-                            <th style={{ padding: '16px 24px', textAlign: 'center' }}>{t.actions}</th>
+                            {safeHeaders.map((h, i) => <th key={i} style={{ padding: '16px 24px', fontWeight: '600' }}>{h}</th>)}
+                            <th style={{ padding: '16px 24px', textAlign: 'center' }}>{t?.actions || "Actions"}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {data.map((row, i) => (
+                        {filteredData.map((row, i) => (
                             <tr key={i} className="glass-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                                {Object.keys(row).map((key, j) => {
+                                {Object.keys(row).filter(k => k !== 'items' && k !== 'activities' && k !== 'transactions' && k !== '_original').map((key, j) => {
                                     const val = row[key];
                                     if (key === 'status') {
-                                        const isPaid = val === 'Paid' || val === 'مدفوع' || val === 'Payé';
+                                        const isPaid = val === 'Paid' || val === 'مدفوع' || val === 'Payé' || val === 'Pending';
                                         return (
                                             <td key={j} style={{ padding: '16px 24px' }}>
                                                 <span style={{
@@ -265,6 +290,9 @@ const TableView = ({ title, subtitle, buttonLabel, onAdd, headers, data, t, isRt
                                             </td>
                                         );
                                     }
+                                    if (typeof val === 'object' && val !== null && !isValidElement(val)) {
+                                        return null;
+                                    }
                                     if (isValidElement(val)) {
                                         return <td key={j} style={{ padding: '16px 24px' }}>{val}</td>;
                                     }
@@ -276,11 +304,17 @@ const TableView = ({ title, subtitle, buttonLabel, onAdd, headers, data, t, isRt
                                 })}
                                 <td style={{ padding: '16px 24px', textAlign: 'center' }}>
                                     <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                        {onPrint && (
+                                            <button onClick={() => onPrint(row._original || row)} style={{ color: '#94a3b8', background: 'transparent', border: 'none', cursor: 'pointer' }} title={t?.print || "Print"}><Printer size={18} /></button>
+                                        )}
+                                        {onEdit && (
+                                            <button onClick={() => onEdit(row._original || row)} style={{ color: '#38bdf8', background: 'transparent', border: 'none', cursor: 'pointer' }} title={t?.edit || "Edit"}><Pencil size={18} /></button>
+                                        )}
                                         {onView && (
-                                            <button onClick={() => onView(row)} style={{ color: '#94a3b8', background: 'transparent', border: 'none', cursor: 'pointer' }}><Eye size={18} /></button>
+                                            <button onClick={() => onView(row._original || row)} style={{ color: '#94a3b8', background: 'transparent', border: 'none', cursor: 'pointer' }} title={t?.view || "View"}><Eye size={18} /></button>
                                         )}
                                         {onDelete && (
-                                            <button onClick={() => onDelete(row)} style={{ color: '#ef4444', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                                            <button onClick={() => onDelete(row._original || row)} style={{ color: '#ef4444', background: 'transparent', border: 'none', cursor: 'pointer' }} title={t?.delete || "Delete"}>
                                                 <Trash2 size={18} />
                                             </button>
                                         )}
@@ -301,13 +335,13 @@ const TableView = ({ title, subtitle, buttonLabel, onAdd, headers, data, t, isRt
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
-const InventoryView = ({ t, isRtl, inventory, onAdd }) => {
+const InventoryView = ({ t, isRtl, inventory, onAdd, fCurrency, onEdit, onDelete }) => {
     const lowStockCount = inventory.filter(i => (i.stock || 0) <= 5).length;
-    const stockValue = inventory.reduce((acc, i) => acc + (parseInt((i.buyPrice || '0').replace(/\D/g, '')) * (i.stock || 0)), 0);
+    const stockValue = inventory.reduce((acc, i) => acc + (parseInt((typeof i.buyPrice === 'string' ? i.buyPrice : i.buyPrice || '0').toString().replace(/\D/g, '')) * (i.stock || 0)), 0);
     const totalProducts = inventory.length;
 
     return (
@@ -327,7 +361,7 @@ const InventoryView = ({ t, isRtl, inventory, onAdd }) => {
                 <div className="glass" style={{ flex: 1, padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1), transparent)' }}>
                     <div>
                         <p style={{ color: '#22c55e', fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>{t.stockValue}</p>
-                        <h3 style={{ fontSize: '24px', fontWeight: '800' }}>{stockValue.toLocaleString()}</h3>
+                        <h3 style={{ fontSize: '24px', fontWeight: '800' }}>{fCurrency(stockValue)}</h3>
                     </div>
                     <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(34, 197, 94, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <BarChart2 size={24} color="#22c55e" />
@@ -362,318 +396,24 @@ const InventoryView = ({ t, isRtl, inventory, onAdd }) => {
                     category: item.category,
                     buy: item.buyPrice,
                     sell: item.sellPrice,
-                    stock: <span style={{ padding: '4px 12px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', borderRadius: '6px', fontWeight: '700', fontSize: '13px' }}>{item.stock}</span>
+                    stock: <span style={{ padding: '4px 12px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', borderRadius: '6px', fontWeight: '700', fontSize: '13px' }}>{item.stock}</span>,
+                    _original: item
                 }))}
                 t={t}
                 isRtl={isRtl}
-                onDelete={(item) => onAdd({ type: 'delete', id: item.code })}
+                onEdit={onEdit}
+                onDelete={onDelete}
             />
         </div>
     );
 };
 
 
-const SalesInvoiceView = ({ t, isRtl, onSave, initialData }) => {
-    const [items, setItems] = useState(initialData ? [
-        { id: 1, name: 'Produit Exemple', qty: 1, price: parseInt(initialData.amount.replace(/\D/g, '')), total: parseInt(initialData.amount.replace(/\D/g, '')) }
-    ] : [
-        { id: 1, name: 'شاشة سامسونج 27 بوصة', qty: 2, price: 14500, total: 29000 },
-    ]);
-    const [date, setDate] = useState(initialData ? initialData.date.replace(/\//g, '-') : new Date().toISOString().split('T')[0]);
-    const [discountType, setDiscountType] = useState('amount');
-    const [discountValue, setDiscountValue] = useState(0);
-    const [paymentMethod, setPaymentMethod] = useState('cash');
 
-    const subtotal = items.reduce((acc, item) => acc + item.total, 0);
-    const tax = subtotal * 0.15;
-    const discount = discountType === 'percentage' ? (subtotal * discountValue / 100) : discountValue;
-    const total = subtotal + tax - discount;
 
-    const removeItem = (id) => setItems(items.filter(item => item.id !== id));
 
-    const handleSave = () => {
-        const newInvoice = {
-            id: initialData ? initialData.id : `INV-${Date.now()}`,
-            client: 'مؤسسة التقنية الحديثة',
-            date: date,
-            status: 'Payé',
-            amount: total.toLocaleString()
-        };
-        onSave(newInvoice);
-    };
 
-    return (
-        <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 120px)' }}>
-            {/* Left Controls */}
-            <div style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div className="glass" style={{ padding: '24px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Users size={18} color="#38bdf8" /> {t.clientData}
-                    </h3>
-                    <FormInput label={t.client} type="select" options={[{ label: 'مؤسسة التقنية الحديثة', value: '1' }]} isRtl={isRtl} />
-                    <FormInput label={t.date} type="date" value={date} onChange={(val) => setDate(val)} isRtl={isRtl} />
-                </div>
-
-                <div className="glass" style={{ padding: '24px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CreditCard size={18} color="#38bdf8" /> {t.paymentMethod}
-                    </h3>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        {[
-                            { id: 'cash', label: t.cashPayment },
-                            { id: 'network', label: t.networkPayment },
-                            { id: 'deferred', label: t.deferredPayment }
-                        ].map(m => (
-                            <button
-                                key={m.id}
-                                onClick={() => setPaymentMethod(m.id)}
-                                style={{
-                                    flex: 1, padding: '10px 4px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                                    background: paymentMethod === m.id ? '#38bdf8' : 'rgba(255,255,255,0.05)',
-                                    color: paymentMethod === m.id ? 'white' : '#94a3b8', transition: 'all 0.2s'
-                                }}
-                            >
-                                {m.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="glass" style={{ padding: '24px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px' }}>{t.discount}</h3>
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                        <button onClick={() => setDiscountType('amount')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', background: discountType === 'amount' ? 'rgba(56, 189, 248, 0.1)' : 'transparent', color: discountType === 'amount' ? '#38bdf8' : '#94a3b8' }}>{t.discountAmount}</button>
-                        <button onClick={() => setDiscountType('percentage')} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', fontSize: '12px', background: discountType === 'percentage' ? 'rgba(56, 189, 248, 0.1)' : 'transparent', color: discountType === 'percentage' ? '#38bdf8' : '#94a3b8' }}>{t.discountPercentage}</button>
-                    </div>
-                    <input
-                        type="number"
-                        value={discountValue}
-                        onChange={(e) => setDiscountValue(Number(e.target.value))}
-                        className="glass"
-                        style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', textAlign: 'center', fontSize: '18px', fontWeight: '700' }}
-                    />
-                </div>
-
-                <div style={{ marginTop: 'auto', background: '#0f172a', borderRadius: '16px', padding: '24px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', color: '#94a3b8', fontSize: '14px' }}>
-                        <span>{t.subtotal}</span>
-                        <span>{formatCurrency(subtotal)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', color: '#94a3b8', fontSize: '14px' }}>
-                        <span>{t.tax}</span>
-                        <span>{formatCurrency(tax)}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                        <span style={{ fontWeight: '700' }}>{t.totalFinal}</span>
-                        <span style={{ fontSize: '24px', fontWeight: '800', color: '#22c55e' }}>{formatCurrency(total)}</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleSave} className="glass sidebar-active" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none' }}>
-                        <FileText size={18} /> {t.save} {t.newInvoiceShort}
-                    </button>
-                    <button onClick={() => window.print()} className="glass" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', cursor: 'pointer', border: 'none' }}>
-                        <Printer size={18} /> {t.printing} (Native)
-                    </button>
-                    <button onClick={() => {
-                        generateInvoicePDF({
-                            id: initialData ? initialData.id : `INV-${Date.now()}`,
-                            client: 'مؤسسة التقنية الحديثة', // From props or state
-                            date: date,
-                            status: 'Draft',
-                            items: items,
-                            subtotal: subtotal,
-                            tax: tax,
-                            discount: discount,
-                            total: total
-                        }, t);
-                    }} className="glass" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', color: '#38bdf8', cursor: 'pointer', border: 'none' }}>
-                        <Download size={18} /> PDF
-                    </button>
-                    <div style={{ flex: 1 }}></div>
-                    <div style={{ color: '#94a3b8', fontSize: '12px', textAlign: 'right' }}>
-                        INV-798676
-                    </div>
-                </div>
-
-                <div className="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div className="glass" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px', background: 'rgba(255,255,255,0.02)' }}>
-                            <Search size={18} color="#94a3b8" />
-                            <input
-                                placeholder={t.searchProduct}
-                                style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%', fontSize: '14px' }}
-                            />
-                        </div>
-                    </div>
-
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
-                            <thead style={{ background: 'rgba(255,255,255,0.01)', color: '#94a3b8', fontSize: '13px' }}>
-                                <tr>
-                                    <th style={{ padding: '16px 24px', width: '50px' }}>#</th>
-                                    <th style={{ padding: '16px 24px' }}>{t.product}</th>
-                                    <th style={{ padding: '16px 24px', textAlign: 'center' }}>{t.quantity}</th>
-                                    <th style={{ padding: '16px 24px', textAlign: 'center' }}>{t.price}</th>
-                                    <th style={{ padding: '16px 24px', textAlign: 'center' }}>{t.amount}</th>
-                                    <th style={{ padding: '16px 24px', width: '50px' }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.map((item, index) => (
-                                    <tr key={item.id} className="glass-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '20px 24px', color: '#94a3b8' }}>{index + 1}</td>
-                                        <td style={{ padding: '20px 24px', fontWeight: '600' }}>{item.name}</td>
-                                        <td style={{ padding: '20px 24px', textAlign: 'center' }}>
-                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                                                {item.qty}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '20px 24px', textAlign: 'center' }}>
-                                            <div style={{ display: 'inline-flex', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', color: '#94a3b8' }}>
-                                                {formatCurrency(item.price)}
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '20px 24px', textAlign: 'center', fontWeight: '700', color: '#38bdf8' }}>
-                                            {formatCurrency(item.total)}
-                                        </td>
-                                        <td style={{ padding: '20px 24px' }}>
-                                            <button onClick={() => removeItem(item.id)} style={{ color: '#ef4444', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                                                <X size={18} />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const PurchaseInvoiceView = ({ t, isRtl, onSave, initialData }) => {
-    const [items, setItems] = useState(initialData ? [
-        { id: 1, name: 'Produit Fournisseur', qty: 10, price: parseInt(initialData.amount.replace(/\D/g, '')) / 10, total: parseInt(initialData.amount.replace(/\D/g, '')) }
-    ] : [
-        { id: 1, name: 'Composants PC', qty: 5, price: 3000, total: 15000 },
-    ]);
-    const [date, setDate] = useState(initialData ? initialData.date.replace(/\//g, '-') : new Date().toISOString().split('T')[0]);
-    const [paymentMethod, setPaymentMethod] = useState('deferred');
-
-    const subtotal = items.reduce((acc, item) => acc + item.total, 0);
-    const tax = subtotal * 0.15;
-    const total = subtotal + tax;
-
-    const removeItem = (id) => setItems(items.filter(item => item.id !== id));
-
-    const handleSave = () => {
-        const newInvoice = {
-            id: initialData ? initialData.id : `PUR-${Date.now()}`,
-            supplier: 'Tech Supply Co',
-            date: date,
-            status: 'Payé',
-            amount: total.toLocaleString()
-        };
-        onSave(newInvoice);
-    };
-
-    return (
-        <div style={{ display: 'flex', gap: '24px', height: 'calc(100vh - 120px)' }}>
-            <div style={{ width: '320px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div className="glass" style={{ padding: '24px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Users size={18} color="#10b981" /> {t.supplier}
-                    </h3>
-                    <FormInput label={t.supplierName} type="select" options={[{ label: 'Tech Supply Co', value: '1' }]} isRtl={isRtl} />
-                    <FormInput label={t.date} type="date" value={date} onChange={(val) => setDate(val)} isRtl={isRtl} />
-                </div>
-
-                <div className="glass" style={{ padding: '24px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '20px' }}>{t.paymentMethod}</h3>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        {[{ id: 'cash', label: t.cashPayment }, { id: 'deferred', label: t.deferredPayment }].map(m => (
-                            <button key={m.id} onClick={() => setPaymentMethod(m.id)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: paymentMethod === m.id ? '#10b981' : 'rgba(255,255,255,0.05)', color: paymentMethod === m.id ? 'white' : '#94a3b8', cursor: 'pointer' }}>{m.label}</button>
-                        ))}
-                    </div>
-                </div>
-
-                <div style={{ marginTop: 'auto', background: '#064e3b', borderRadius: '16px', padding: '24px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: '700' }}>{t.totalFinal}</span>
-                        <span style={{ fontSize: '24px', fontWeight: '800', color: '#34d399' }}>{formatCurrency(total)}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={handleSave} className="glass sidebar-active" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', background: '#10b981' }}>
-                        <FileText size={18} /> {t.save} {t.newPurchase}
-                    </button>
-                    <button onClick={() => window.print()} className="glass" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', cursor: 'pointer', border: 'none' }}>
-                        <Printer size={18} /> {t.printing} (Native)
-                    </button>
-                    <button onClick={() => {
-                        generateInvoicePDF({
-                            id: initialData ? initialData.id : `PUR-${Date.now()}`,
-                            client: 'Tech Supply Co', // Supplier name
-                            date: date,
-                            status: 'Paid',
-                            items: items,
-                            subtotal: subtotal,
-                            tax: tax,
-                            total: total
-                        }, t);
-                    }} className="glass" style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', color: '#10b981', cursor: 'pointer', border: 'none' }}>
-                        <Download size={18} /> PDF
-                    </button>
-                    <div style={{ flex: 1 }}></div>
-                </div>
-
-                <div className="glass" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ padding: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div className="glass" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 20px', background: 'rgba(255,255,255,0.02)' }}>
-                            <Search size={18} color="#94a3b8" />
-                            <input placeholder={t.searchProduct} style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%', fontSize: '14px' }} />
-                        </div>
-                    </div>
-                    <div style={{ flex: 1, overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: isRtl ? 'right' : 'left' }}>
-                            <thead style={{ background: 'rgba(255,255,255,0.01)', color: '#94a3b8', fontSize: '13px' }}>
-                                <tr>
-                                    <th style={{ padding: '16px 24px' }}>#</th>
-                                    <th style={{ padding: '16px 24px' }}>{t.product}</th>
-                                    <th style={{ padding: '16px 24px' }}>{t.quantity}</th>
-                                    <th style={{ padding: '16px 24px' }}>{t.totalFinal}</th>
-                                    <th style={{ padding: '16px 24px' }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {items.map((item, i) => (
-                                    <tr key={i} className="glass-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '20px 24px' }}>{i + 1}</td>
-                                        <td style={{ padding: '20px 24px' }}>{item.name}</td>
-                                        <td style={{ padding: '20px 24px' }}>{item.qty}</td>
-                                        <td style={{ padding: '20px 24px', color: '#10b981', fontWeight: '700' }}>{item.total.toLocaleString()}</td>
-                                        <td style={{ padding: '20px 24px' }}><button onClick={() => removeItem(item.id)} style={{ color: '#ef4444', background: 'transparent', border: 'none' }}><X size={18} /></button></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdit }) => {
+const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdit, fCurrency }) => {
     const [filterAccount, setFilterAccount] = useState('all');
 
     const filteredTransactions = transactions.filter(tr =>
@@ -701,9 +441,9 @@ const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdi
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
                 {[
-                    { label: t.cashIn, value: formatCurrency(1250000), color: '#22c55e' },
-                    { label: t.cashOut, value: formatCurrency(450000), color: '#ef4444' },
-                    { label: t.balance, value: formatCurrency(800000), color: '#38bdf8' }
+                    { label: t.cashIn, value: fCurrency(1250000), color: '#22c55e' },
+                    { label: t.cashOut, value: fCurrency(450000), color: '#ef4444' },
+                    { label: t.balance, value: fCurrency(800000), color: '#38bdf8' }
                 ].map((stat, i) => (
                     <div key={i} className="glass" style={{ flex: 1, padding: '24px', background: `linear-gradient(135deg, ${stat.color}10, transparent)` }}>
                         <p style={{ color: stat.color, fontSize: '14px', fontWeight: '600' }}>{stat.label}</p>
@@ -722,10 +462,11 @@ const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdi
                     desc: tr.desc,
                     status: tr.type === 'Cash In' || tr.type === 'قبض' ? 'Payé' : 'Sortie',
                     method: tr.method,
-                    amount: tr.anim
+                    amount: fCurrency(tr.anim)
                 }))}
                 t={t}
                 isRtl={isRtl}
+                onEdit={onEdit}
                 onDelete={onDelete}
                 onView={onEdit}
             />
@@ -733,7 +474,7 @@ const TreasuryView = ({ t, isRtl, transactions, onAdd, accounts, onDelete, onEdi
     );
 };
 
-const ChartOfAccountsView = ({ t, isRtl, onAdd, accounts, onDelete }) => {
+const ChartOfAccountsView = ({ t, isRtl, onAdd, accounts, onDelete, fCurrency }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
 
@@ -805,7 +546,7 @@ const ChartOfAccountsView = ({ t, isRtl, onAdd, accounts, onDelete }) => {
                     >
                         <div>
                             <p style={{ fontSize: '14px', fontWeight: '600', color: stat.color, marginBottom: '8px' }}>{stat.label}</p>
-                            <h3 style={{ fontSize: '20px', fontWeight: '800', color: stat.color }}>{formatCurrency(stat.value)}</h3>
+                            <h3 style={{ fontSize: '20px', fontWeight: '800', color: stat.color }}>{fCurrency(stat.value)}</h3>
                         </div>
                         <stat.icon size={24} color={stat.color} style={{ opacity: 0.8 }} />
                     </motion.div>
@@ -889,7 +630,7 @@ const ChartOfAccountsView = ({ t, isRtl, onAdd, accounts, onDelete }) => {
                                         {getNature(acc.type)}
                                     </td>
                                     <td style={{ padding: '16px 24px', color: 'white', fontWeight: '700' }}>
-                                        {formatCurrency(acc.balance)}
+                                        {fCurrency(acc.balance)}
                                     </td>
                                     <td style={{ padding: '16px 24px' }}>
                                         <span style={{ padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}>
@@ -916,9 +657,11 @@ const CustomersSuppliersView = ({ t, isRtl, contacts, onAdd, onEdit, onDelete, o
     const [searchTerm, setSearchTerm] = useState('');
 
     const filteredContacts = contacts.filter(c => {
+        const name = c?.name?.toLowerCase() || '';
+        const phone = c?.phone || '';
         const matchesFilter = filter === 'all' || c.type === filter;
-        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (c.phone && c.phone.includes(searchTerm));
+        const matchesSearch = name.includes(searchTerm.toLowerCase()) ||
+            phone.includes(searchTerm);
         return matchesFilter && matchesSearch;
     });
 
@@ -1023,7 +766,7 @@ const CustomersSuppliersView = ({ t, isRtl, contacts, onAdd, onEdit, onDelete, o
                         {/* Balance */}
                         <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', marginTop: '8px' }}>
                             <span style={{ fontSize: '13px', color: '#94a3b8' }}>{t.currentBalance}</span>
-                            <span style={{ fontWeight: '800', fontSize: '16px', color: contact.balance.includes('-') ? '#ef4444' : '#22c55e' }}>{contact.balance}</span>
+                            <span style={{ fontWeight: '800', fontSize: '16px', color: String(contact.balance || 0).includes('-') || (typeof contact.balance === 'number' && contact.balance < 0) ? '#ef4444' : '#22c55e' }}>{contact.balance}</span>
                         </div>
 
                         {/* Account Statement Button */}
@@ -1039,7 +782,7 @@ const CustomersSuppliersView = ({ t, isRtl, contacts, onAdd, onEdit, onDelete, o
 
 // --- Login View ---
 
-const LoginView = ({ t, isRtl, onLogin }) => {
+const LoginView = ({ t, isRtl, onLogin, lang }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
@@ -1051,94 +794,159 @@ const LoginView = ({ t, isRtl, onLogin }) => {
     return (
         <div style={{
             position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'radial-gradient(circle at center, #1e293b 0%, #0f172a 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+            background: '#020617',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', direction: isRtl ? 'rtl' : 'ltr'
         }}>
+            {/* Background Blobs */}
+            <div style={{ position: 'absolute', top: '0', left: '0', right: '0', bottom: '0', zIndex: 0 }}>
+                <motion.div animate={{ scale: [1, 1.2, 1], x: [0, 30, 0] }} transition={{ duration: 15, repeat: Infinity }} style={{ position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%', background: 'radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%)', filter: 'blur(50px)' }} />
+                <motion.div animate={{ scale: [1, 1.3, 1], x: [0, -30, 0] }} transition={{ duration: 18, repeat: Infinity }} style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '50%', height: '50%', background: 'radial-gradient(circle, rgba(129, 140, 248, 0.08) 0%, transparent 70%)', filter: 'blur(70px)' }} />
+            </div>
+
             <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="glass"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.8 }}
                 style={{
-                    width: '100%', maxWidth: '450px', padding: '40px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                    borderRadius: '24px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                    width: '100%', maxWidth: '1000px', height: '640px',
+                    display: 'flex', position: 'relative', zIndex: 1,
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '40px', overflow: 'hidden',
+                    boxShadow: '0 40px 100px -20px rgba(0, 0, 0, 0.7)'
                 }}
             >
-                <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                    <div style={{
-                        width: '64px', height: '64px', borderRadius: '20px',
-                        background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        margin: '0 auto 24px', boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)'
-                    }}>
-                        <Layers size={32} color="white" />
+                {/* Left Side: Branding/Design */}
+                <div style={{
+                    flex: 1, padding: '60px',
+                    background: 'linear-gradient(135deg, rgba(30, 58, 138, 0.4) 0%, rgba(15, 23, 42, 0.6) 100%)',
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                    borderRight: isRtl ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
+                    borderLeft: isRtl ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                    position: 'relative', overflow: 'hidden'
+                }}>
+                    <div style={{ position: 'relative', zIndex: 2 }}>
+                        <div style={{
+                            width: '64px', height: '64px', borderRadius: '18px',
+                            background: 'linear-gradient(135deg, #38bdf8, #1d4ed8)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            marginBottom: '32px', boxShadow: '0 10px 30px rgba(56, 189, 248, 0.4)'
+                        }}>
+                            <Layers size={32} color="white" />
+                        </div>
+                        <h1 style={{
+                            fontSize: '40px', fontWeight: '900', marginBottom: '24px', color: 'white',
+                            letterSpacing: '-1.5px', lineHeight: 1.1
+                        }}>
+                            {t.appName} <span style={{ color: '#38bdf8' }}>Enterprise</span>
+                        </h1>
+                        <p style={{ fontSize: '18px', color: '#94a3b8', lineHeight: 1.6, marginBottom: '40px', maxWidth: '340px' }}>
+                            {lang === 'fr' ? "La solution complète pour votre gestion comptable et commerciale." :
+                                lang === 'ar' ? "الحل المتكامل لإدارة حساباتك وتجارتك." :
+                                    "The complete solution for your accounting and business management."}
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            {[
+                                { icon: TrendingUp, text: lang === 'fr' ? "Suivi des revenus en temps réel" : lang === 'ar' ? "متابعة الإيرادات لحظياً" : "Real-time revenue tracking" },
+                                { icon: Users, text: lang === 'fr' ? "Gestion clients & fournisseurs" : lang === 'ar' ? "إدارة العملاء والموردين" : "Client & supplier management" },
+                                { icon: Shield, text: lang === 'fr' ? "Sécurité de données bancaire" : lang === 'ar' ? "أمان بيانات بنكي" : "Bank-level data security" }
+                            ].map((feature, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                    <div style={{ color: '#38bdf8' }}><feature.icon size={20} /></div>
+                                    <span style={{ fontSize: '15px', color: '#cbd5e1', fontWeight: '500' }}>{feature.text}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <h1 style={{ fontSize: '28px', fontWeight: '800', marginBottom: '8px', background: 'linear-gradient(to right, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t.loginTitle}</h1>
-                    <p style={{ color: '#94a3b8', fontSize: '15px' }}>{t.loginSubtitle}</p>
                 </div>
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#cbd5e1', fontWeight: '500' }}>{t.email}</label>
-                        <div style={{ position: 'relative' }}>
-                            <Mail size={18} color="#64748b" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', [isRtl ? 'right' : 'left']: '16px' }} />
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="name@company.com"
-                                style={{
-                                    width: '100%', padding: '14px', paddingLeft: isRtl ? '14px' : '48px', paddingRight: isRtl ? '48px' : '14px',
-                                    borderRadius: '14px', background: 'rgba(255, 255, 255, 0.05)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', outline: 'none',
-                                    transition: 'all 0.3s ease'
-                                }}
-                                onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
-                                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
-                            />
-                        </div>
+                {/* Right Side: Form */}
+                <div style={{ flex: 1, padding: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ marginBottom: '40px' }}>
+                        <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'white', marginBottom: '8px' }}>{t.loginTitle}</h2>
+                        <p style={{ color: '#64748b', fontSize: '15px' }}>{t.loginSubtitle}</p>
                     </div>
 
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                            <label style={{ fontSize: '14px', color: '#cbd5e1', fontWeight: '500' }}>{t.password}</label>
-                            <a href="#" style={{ fontSize: '13px', color: '#38bdf8', textDecoration: 'none' }}>{t.forgotPassword}</a>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '10px', fontSize: '14px', color: '#cbd5e1', fontWeight: '600' }}>{t.email}</label>
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: '50%', [isRtl ? 'right' : 'left']: '20px', transform: 'translateY(-50%)', color: '#64748b' }}>
+                                    <Mail size={20} />
+                                </div>
+                                <input
+                                    type="email"
+                                    required
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="admin@skyaccount.com"
+                                    style={{
+                                        width: '100%', padding: '16px 20px', paddingLeft: isRtl ? '20px' : '56px', paddingRight: isRtl ? '56px' : '20px',
+                                        borderRadius: '16px', background: 'rgba(255, 255, 255, 0.03)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', outline: 'none',
+                                        fontSize: '15px', transition: 'all 0.3s ease'
+                                    }}
+                                    className="login-input"
+                                />
+                            </div>
                         </div>
-                        <div style={{ position: 'relative' }}>
-                            <Lock size={18} color="#64748b" style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', [isRtl ? 'right' : 'left']: '16px' }} />
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                placeholder="••••••••"
-                                style={{
-                                    width: '100%', padding: '14px', paddingLeft: isRtl ? '14px' : '48px', paddingRight: isRtl ? '48px' : '14px',
-                                    borderRadius: '14px', background: 'rgba(255, 255, 255, 0.05)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', outline: 'none'
-                                }}
-                                onFocus={(e) => e.target.style.borderColor = '#38bdf8'}
-                                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
-                            />
-                        </div>
-                    </div>
 
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        type="submit"
-                        style={{
-                            background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
-                            color: 'white', padding: '16px', borderRadius: '14px',
-                            border: 'none', fontWeight: '700', fontSize: '16px', cursor: 'pointer',
-                            marginTop: '10px', boxShadow: '0 10px 20px -5px rgba(37, 99, 235, 0.5)'
-                        }}
-                    >
-                        {t.loginButton}
-                    </motion.button>
-                </form>
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <label style={{ fontSize: '14px', color: '#cbd5e1', fontWeight: '600' }}>{t.password}</label>
+                                <a href="#" style={{ fontSize: '13px', color: '#38bdf8', textDecoration: 'none', fontWeight: '600' }}>{t.forgotPassword}</a>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: '50%', [isRtl ? 'right' : 'left']: '20px', transform: 'translateY(-50%)', color: '#64748b' }}>
+                                    <Lock size={20} />
+                                </div>
+                                <input
+                                    type="password"
+                                    required
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    style={{
+                                        width: '100%', padding: '16px 20px', paddingLeft: isRtl ? '20px' : '56px', paddingRight: isRtl ? '56px' : '20px',
+                                        borderRadius: '16px', background: 'rgba(255, 255, 255, 0.03)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)', color: 'white', outline: 'none',
+                                        fontSize: '15px', transition: 'all 0.3s ease'
+                                    }}
+                                    className="login-input"
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input type="checkbox" id="remember" style={{ accentColor: '#38bdf8' }} />
+                            <label htmlFor="remember" style={{ fontSize: '14px', color: '#94a3b8', cursor: 'pointer' }}>{lang === 'ar' ? "تذكرني" : "Se souvenir de moi"}</label>
+                        </div>
+
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            type="submit"
+                            style={{
+                                background: 'linear-gradient(135deg, #38bdf8, #1d4ed8)',
+                                color: 'white', padding: '18px', borderRadius: '16px',
+                                border: 'none', fontWeight: '800', fontSize: '16px', cursor: 'pointer',
+                                marginTop: '10px'
+                            }}
+                        >
+                            {t.loginButton}
+                        </motion.button>
+                    </form>
+
+                    <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
+                        {lang === 'fr' ? "Besoin d'aide ?" : lang === 'ar' ? "تحتاج مساعدة؟" : "Need help?"} <a href="#" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '700' }}>{lang === 'ar' ? "تواصل معي" : "Contactez le support"}</a>
+                    </p>
+                </div>
             </motion.div>
+
+            <style>{`.login-input:focus { border-color: #38bdf8 !important; background: rgba(56, 189, 248, 0.05) !important; }`}</style>
         </div>
     );
 };
@@ -1159,24 +967,86 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
     const t = translations[lang];
     const isRtl = lang === 'ar';
 
-    const [sales, setSales] = useState([
-        { id: 'INV-1769196812581', client: 'مؤسسة التقنية الحديثة', date: '2026/01/23', status: 'Payé', amount: '33,350' },
-        { id: 'INV-1768905734828', client: 'مؤسسة التقنية الحديثة', date: '2026/01/20', status: 'Payé', amount: '59,800' }
-    ]);
-    const [purchases, setPurchases] = useState([
-        { id: 'PUR-2024-101', supplier: 'Tech Supply Co', date: '2024/03/18', status: 'Payé', amount: '15,000' },
-        { id: 'PUR-2024-102', supplier: 'Global Parts', date: '2024/03/22', status: 'En attente', amount: '8,400' }
-    ]);
-    const [treasury, setTreasury] = useState([{ id: 'TRE-INIT-1', date: '2024-03-22', desc: 'Office Rent', type: 'Cash Out', method: 'Cash', anim: 'DA 500.00' }]);
-    const [customers, setCustomers] = useState([
-        { name: 'John Doe', type: 'client', email: 'john@alpha.com', balance: 'DA 1,200.00', phone: '0501234567', location: 'Riyadh' },
-        { name: 'Tech Supply Co', type: 'supplier', email: 'sales@techsupply.com', balance: '- DA 15,000.00', phone: '0559876543', location: 'Jeddah' }
-    ]);
-    const [inventory, setInventory] = useState([
-        { code: 'PRD-001', name: 'MacBook Pro M3', category: 'Laptops', stock: 12, buyPrice: '45,000', sellPrice: '52,000' },
-        { code: 'PRD-002', name: 'iPhone 15 Pro', category: 'Phones', stock: 3, buyPrice: '35,000', sellPrice: '42,000' }
-    ]);
-    const [accounts, setAccounts] = useState(initialAccounts);
+    const [sales, setSales] = useState([]);
+    const [purchases, setPurchases] = useState([]);
+    const [treasury, setTreasury] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [inventory, setInventory] = useState([]);
+    const [accounts, setAccounts] = useState([]);
+    const [companySettings, setCompanySettings] = useLocalStorage('companySettings', {
+        name: 'Ilyas Accountant',
+        email: 'admin@ilyas.com',
+        phone: '0501234567',
+        address: '123 Business Street, Tech City',
+        taxNumber: '300012345600003',
+        currency: 'DA'
+    });
+
+    const [dateRange, setDateRange] = useState({
+        start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
+
+    // Load Data from Supabase
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const [p, c, a, t, i] = await Promise.all([
+                    api.products.list(),
+                    api.contacts.list(),
+                    api.accounts.list(),
+                    api.transactions.list(),
+                    api.invoices.list()
+                ]);
+
+                // Map Products
+                if (p) setInventory(p.map(x => ({ ...x, buyPrice: x.buy_price, sellPrice: x.sell_price, minLimit: x.min_stock })));
+
+                // Map Contacts
+                if (c) setCustomers(c.map(x => ({ ...x, location: x.location || '' })));
+
+                // Map Accounts
+                setAccounts(a && a.length > 0 ? a : []);
+
+                // Map Treasury
+                if (t) setTreasury(t.map(x => ({ ...x, anim: x.amount, desc: x.description })));
+
+                // Split invoices
+                if (i && c) {
+                    const mappedInvoices = i.map(inv => {
+                        const contact = c.find(con => con.id === inv.contact_id);
+                        return {
+                            ...inv,
+                            client: contact?.name,
+                            supplier: contact?.name,
+                            amount: formatCurrency(inv.total_amount, companySettings?.currency || 'DA') // Keep amount as string for UI display compatibility if needed, but safer to keep original value too?
+                            // Logic: UI uses amount for display.
+                        };
+                    });
+                    setSales(mappedInvoices.filter(inv => inv.type === 'sale'));
+                    setPurchases(mappedInvoices.filter(inv => inv.type === 'purchase'));
+                }
+            } catch (error) {
+                console.error("Failed to load data:", error);
+            }
+        };
+        loadData();
+    }, [companySettings]);
+
+    const fCurrency = (val) => formatCurrency(val, companySettings?.currency || 'DA');
+
+    // Filter Logic
+    const filterByDate = (items, dateKey = 'date') => {
+        if (!dateRange.start || !dateRange.end) return items;
+        return items.filter(item => {
+            const d = item[dateKey];
+            return d >= dateRange.start && d <= dateRange.end;
+        });
+    };
+
+    const filteredSales = filterByDate(sales);
+    const filteredPurchases = filterByDate(purchases);
+    const filteredTreasury = filterByDate(treasury);
 
     const [invForm, setInvForm] = useState({ client: '', amount: '', date: new Date().toISOString().split('T')[0] });
     const [transForm, setTransForm] = useState({ id: null, desc: '', amount: '', type: 'In', method: 'Cash', accountId: '' });
@@ -1186,61 +1056,201 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
 
     useEffect(() => { document.body.dir = isRtl ? 'rtl' : 'ltr'; }, [isRtl]);
 
-    const handleAddSale = () => {
-        setSales([{ id: `INV-2024-${sales.length + 100}`, client: invForm.client, date: invForm.date, amount: `DA ${invForm.amount}`, status: 'Pending' }, ...sales]);
-        setModalType(null);
+    const handleAddSale = async () => {
+        try {
+            const contact = customers.find(c => c.name === invForm.client);
+            const newInvoice = {
+                number: `INV-${Date.now()}`,
+                type: 'sale',
+                date: invForm.date,
+                contact_id: contact?.id,
+                total_amount: parseFloat(invForm.amount),
+                status: 'Pending'
+            };
+            const saved = await api.invoices.create(newInvoice);
+            const mappedSaved = {
+                ...saved,
+                client: contact?.name,
+                supplier: contact?.name,
+                amount: fCurrency(saved.total_amount)
+            };
+            setSales([mappedSaved, ...sales]);
+            setModalType(null);
+        } catch (e) { console.error(e); alert("Failed to save sale"); }
     };
 
-    const handleAddPurchase = () => {
-        setPurchases([{ id: `PUR-2024-${purchases.length + 100}`, supplier: invForm.client, date: invForm.date, amount: `DA ${invForm.amount}`, status: 'Paid' }, ...purchases]);
-        setModalType(null);
+    const handleAddPurchase = async () => {
+        try {
+            const contact = customers.find(c => c.name === invForm.client);
+            const newInvoice = {
+                number: `PUR-${Date.now()}`,
+                type: 'purchase',
+                date: invForm.date,
+                contact_id: contact?.id,
+                total_amount: parseFloat(invForm.amount),
+                status: 'Paid'
+            };
+            const saved = await api.invoices.create(newInvoice);
+            const mappedSaved = {
+                ...saved,
+                client: contact?.name,
+                supplier: contact?.name,
+                amount: fCurrency(saved.total_amount)
+            };
+            setPurchases([mappedSaved, ...purchases]);
+            setModalType(null);
+        } catch (e) { console.error(e); alert("Failed to save purchase"); }
     };
 
-    const handleAddTrans = () => {
-        if (transForm.id) {
-            setTreasury(treasury.map(tr => tr.id === transForm.id ? {
-                ...tr,
-                desc: transForm.desc,
-                type: transForm.type === 'In' ? t.cashIn : t.cashOut,
-                method: transForm.method,
-                anim: `DA ${transForm.amount}`,
-                accountId: transForm.accountId
-            } : tr));
-        } else {
-            setTreasury([{
-                id: `TRE-${Date.now()}`,
-                date: new Date().toISOString().split('T')[0],
-                desc: transForm.desc,
-                type: transForm.type === 'In' ? t.cashIn : t.cashOut,
-                method: transForm.method,
-                anim: `DA ${transForm.amount}`,
-                accountId: transForm.accountId
-            }, ...treasury]);
-        }
-        setModalType(null);
+    const handleAddTrans = async () => {
+        const transaction = {
+            date: invForm.date || new Date().toISOString().split('T')[0],
+            description: transForm.desc,
+            type: transForm.type === 'In' || transForm.type === t.cashIn ? 'Cash In' : 'Cash Out',
+            method: transForm.method,
+            amount: parseFloat(transForm.amount),
+            account_id: transForm.accountId || null
+        };
+
+        try {
+            let saved;
+            if (transForm.id) {
+                saved = await api.transactions.update(transForm.id, transaction);
+                const mapped = { ...saved, anim: fCurrency(saved.amount), desc: saved.description };
+                setTreasury(treasury.map(tr => tr.id === saved.id ? mapped : tr));
+            } else {
+                saved = await api.transactions.create(transaction);
+                const mapped = { ...saved, anim: fCurrency(saved.amount), desc: saved.description };
+                setTreasury([mapped, ...treasury]);
+            }
+            setModalType(null);
+        } catch (e) { console.error(e); alert("Failed to save transaction"); }
     };
 
-    const handleAddProduct = () => {
-        setInventory([{ name: productForm.name, category: productForm.category, stock: parseInt(productForm.stock || 0), buyPrice: productForm.buy, sellPrice: productForm.sell }, ...inventory]);
-        setModalType(null);
+    const handleEditProduct = (product) => {
+        setProductForm({
+            id: product.id,
+            name: product.name,
+            code: product.code,
+            barcode: product.barcode || '',
+            category: product.category,
+            unit: product.unit || 'Piece',
+            buy: typeof product.buyPrice === 'string' ? product.buyPrice.replace(/[^0-9.-]+/g, '') : product.buyPrice,
+            sell: typeof product.sellPrice === 'string' ? product.sellPrice.replace(/[^0-9.-]+/g, '') : product.sellPrice,
+            stock: product.stock,
+            minLimit: product.minLimit || 5
+        });
+        setModalType('addProduct');
     };
 
-    const handleAddContact = () => {
-        setCustomers([{
+    const handleAddProduct = async () => {
+        const productData = {
+            name: productForm.name,
+            code: productForm.code,
+            category: productForm.category,
+            stock: parseInt(productForm.stock || 0),
+            buy_price: parseFloat(productForm.buy),
+            sell_price: parseFloat(productForm.sell),
+            min_stock: parseInt(productForm.minLimit || 5),
+            // Extras not in schema but maybe useful? schema has basic cols.
+        };
+
+        try {
+            let saved;
+            if (productForm.id) {
+                saved = await api.products.update(productForm.id, productData);
+                const mapped = { ...saved, buyPrice: saved.buy_price, sellPrice: saved.sell_price, minLimit: saved.min_stock };
+                setInventory(inventory.map(p => p.id === mapped.id ? mapped : p));
+            } else {
+                saved = await api.products.create(productData);
+                const mapped = { ...saved, buyPrice: saved.buy_price, sellPrice: saved.sell_price, minLimit: saved.min_stock };
+                setInventory([mapped, ...inventory]);
+            }
+            setModalType(null);
+            setProductForm({ name: '', code: `PRD-${Math.floor(Math.random() * 1000)}`, barcode: '', category: '', unit: 'Piece', buy: '', sell: '', stock: '', minLimit: 5 });
+        } catch (e) { console.error(e); alert("Failed to save product"); }
+    };
+
+    // Additional Handlers for Deletion
+    const handleDeleteSale = async (invoice) => {
+        if (!window.confirm("Delete this invoice?")) return;
+        try {
+            await api.invoices.delete(invoice.id);
+            setSales(sales.filter(s => s.id !== invoice.id));
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeletePurchase = async (invoice) => {
+        if (!window.confirm("Delete this purchase?")) return;
+        try {
+            await api.invoices.delete(invoice.id);
+            setPurchases(purchases.filter(p => p.id !== invoice.id));
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeleteTransaction = async (tr) => {
+        if (!window.confirm("Delete this transaction?")) return;
+        try {
+            await api.transactions.delete(tr.id);
+            setTreasury(treasury.filter(item => item.id !== tr.id));
+        } catch (e) { console.error(e); alert("Failed to delete transaction"); }
+    };
+
+    const handleDeleteProduct = async (product) => {
+        if (!window.confirm("Delete this product?")) return;
+        try {
+            await api.products.delete(product.id);
+            setInventory(inventory.filter(p => p.id !== product.id));
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeleteContact = async (contact) => {
+        if (!window.confirm("Delete this contact?")) return;
+        try {
+            await api.contacts.delete(contact.id);
+            setCustomers(customers.filter(c => c.id !== contact.id));
+        } catch (e) { console.error(e); }
+    };
+
+    const handleDeleteAccount = async (account) => {
+        if (!window.confirm("Delete this account?")) return;
+        try {
+            await api.accounts.delete(account.id);
+            setAccounts(accounts.filter(a => a.id !== account.id));
+        } catch (e) { console.error(e); }
+    };
+
+    const handleAddContact = async () => {
+        const contactData = {
             name: contactForm.name,
             type: contactForm.type,
-            email: contactForm.email,
-            balance: `DA ${contactForm.balance}`,
+            // email: contactForm.email, // Not in schema but useful
             phone: contactForm.phone,
             location: contactForm.address,
-            taxNumber: contactForm.taxNumber
-        }, ...customers]);
-        setModalType(null);
+            balance: parseFloat(typeof contactForm.balance === 'string' ? contactForm.balance.replace(/[^0-9.-]+/g, '') : contactForm.balance || 0),
+            // taxNumber: contactForm.taxNumber // Not in schema
+        };
+        try {
+            const saved = await api.contacts.create(contactData);
+            setCustomers([saved, ...customers]);
+            setModalType(null);
+        } catch (e) { console.error(e); alert("Failed to save contact"); }
     };
 
-    const handleAddAccount = () => {
-        setAccounts([...accounts, { ...accountForm }]);
-        setModalType(null);
+    const handleAddAccount = async () => {
+        const accountData = {
+            code: accountForm.code,
+            name: accountForm.name,
+            type: accountForm.type,
+            parent_id: accountForm.parent || null,
+            balance: parseFloat(accountForm.balance || 0),
+            is_system: false
+        };
+        try {
+            const saved = await api.accounts.create(accountData);
+            setAccounts([...accounts, saved]);
+            setModalType(null);
+        } catch (e) { console.error(e); alert("Failed to save account"); }
     };
 
     return (
@@ -1250,12 +1260,16 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} t={t} isRtl={isRtl} onLogout={onLogout} />
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                <Header lang={lang} setLang={setLang} t={t} isRtl={isRtl} />
+                <Header
+                    lang={lang} setLang={setLang} t={t} isRtl={isRtl} settings={companySettings}
+                    dateRange={dateRange} setDateRange={setDateRange}
+                    showFilter={activeTab !== 'dashboard' && activeTab !== 'settings'}
+                />
 
                 <main style={{ flex: 1, padding: '0 32px 32px 32px', overflowY: 'auto' }}>
                     <AnimatePresence mode="wait">
                         <motion.div key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} transition={{ duration: 0.2 }}>
-                            {activeTab === 'dashboard' && <DashboardView t={t} isRtl={isRtl} onAddInvoice={() => setModalType('sale')} invoices={sales} customers={customers} expenses={[]} activities={[]} />}
+                            {activeTab === 'dashboard' && <DashboardView t={t} isRtl={isRtl} onAddInvoice={() => { setSelectedInvoice(null); setSalesView('create'); setActiveTab('sales'); }} sales={filteredSales} purchases={filteredPurchases} customers={customers} fCurrency={fCurrency} />}
 
                             {activeTab === 'sales' && (
                                 salesView === 'list' ? (
@@ -1265,14 +1279,28 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                         buttonLabel={t.newInvoiceShort}
                                         onAdd={() => { setSelectedInvoice(null); setSalesView('create'); }}
                                         headers={[t.invoiceId, t.client, t.date, t.status, t.amount]}
-                                        data={sales}
+                                        data={filteredSales.map(s => ({
+                                            id: <span style={{ fontWeight: '700', color: '#38bdf8' }}>{s.number || s.id.substring(0, 8)}</span>,
+                                            client: s.client || '---',
+                                            date: s.date,
+                                            status: s.status,
+                                            amount: s.amount,
+                                            _original: s
+                                        }))}
                                         t={t}
                                         isRtl={isRtl}
-                                        onView={(invoice) => {
+                                        onEdit={(invoice) => {
                                             setSelectedInvoice(invoice);
                                             setSalesView('create');
                                         }}
-                                        onDelete={(invoice) => setSales(sales.filter(s => s.id !== invoice.id))}
+                                        onDelete={handleDeleteSale}
+                                        onPrint={(invoice) => {
+                                            setSelectedInvoice(invoice);
+                                            setSalesView('create');
+                                            setTimeout(() => window.print(), 500);
+                                        }}
+                                        dateRange={dateRange}
+                                        setDateRange={setDateRange}
                                     />
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1281,13 +1309,70 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                             t={t}
                                             isRtl={isRtl}
                                             initialData={selectedInvoice}
-                                            onSave={(newInvoice) => {
-                                                if (selectedInvoice) {
-                                                    setSales(sales.map(s => s.id === newInvoice.id ? newInvoice : s));
-                                                } else {
-                                                    setSales([newInvoice, ...sales]);
-                                                }
-                                                setSalesView('list');
+                                            inventory={inventory}
+                                            customers={customers}
+                                            settings={companySettings}
+                                            onSave={async (newInvoice) => {
+                                                try {
+                                                    const contact = customers.find(c => c.name === newInvoice.client);
+                                                    const invoiceData = {
+                                                        number: newInvoice.id,
+                                                        type: 'sale',
+                                                        date: newInvoice.date,
+                                                        contact_id: contact?.id,
+                                                        total_amount: parseFloat(String(newInvoice.amount).replace(/[^0-9.-]+/g, '')),
+                                                        status: newInvoice.status || 'Pending'
+                                                    };
+
+                                                    let saved;
+                                                    if (selectedInvoice) {
+                                                        saved = await api.invoices.update(selectedInvoice.id, invoiceData);
+                                                    } else {
+                                                        saved = await api.invoices.create(invoiceData, (newInvoice.items || []).map(it => ({
+                                                            product_id: inventory.find(p => p.code === it.code)?.id,
+                                                            quantity: it.qty,
+                                                            price: parseFloat(it.price),
+                                                            total: parseFloat(it.price) * it.qty
+                                                        })));
+                                                    }
+
+                                                    // Update Inventory
+                                                    if (newInvoice.items) {
+                                                        const newInventory = [...inventory];
+                                                        await Promise.all(newInvoice.items.map(async item => {
+                                                            const product = inventory.find(p => p.code === item.code);
+                                                            if (product) {
+                                                                const newStock = Math.max(0, (product.stock || 0) - item.qty);
+                                                                await api.products.update(product.id, { stock: newStock });
+                                                                const productIndex = newInventory.findIndex(p => p.id === product.id);
+                                                                newInventory[productIndex] = { ...product, stock: newStock };
+                                                            }
+                                                        }));
+                                                        setInventory(newInventory);
+                                                    }
+
+                                                    // Update Customer Balance
+                                                    if (contact) {
+                                                        const currentBalance = parseFloat(String(contact.balance || 0).replace(/[^0-9.-]+/g, '')) || 0;
+                                                        const invoiceAmount = parseFloat(String(newInvoice.amount).replace(/[^0-9.-]+/g, '')) || 0;
+                                                        const newBalance = currentBalance + invoiceAmount;
+                                                        await api.contacts.update(contact.id, { balance: newBalance });
+                                                        setCustomers(customers.map(c => c.id === contact.id ? { ...c, balance: newBalance } : c));
+                                                    }
+
+                                                    const mappedSaved = {
+                                                        ...saved,
+                                                        client: newInvoice.client,
+                                                        amount: fCurrency(saved.total_amount)
+                                                    };
+
+                                                    if (selectedInvoice) {
+                                                        setSales(sales.map(s => s.id === saved.id ? mappedSaved : s));
+                                                    } else {
+                                                        setSales([mappedSaved, ...sales]);
+                                                    }
+                                                    setSalesView('list');
+                                                } catch (e) { console.error(e); alert("Failed to save invoice"); }
                                             }}
                                         />
                                     </div>
@@ -1302,14 +1387,28 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                         buttonLabel={t.newPurchase}
                                         onAdd={() => { setSelectedPurchase(null); setPurchasesView('create'); }}
                                         headers={[t.invoiceId, t.supplier, t.date, t.status, t.amount]}
-                                        data={purchases}
+                                        data={filteredPurchases.map(p => ({
+                                            id: <span style={{ fontWeight: '700', color: '#10b981' }}>{p.number || p.id.substring(0, 8)}</span>,
+                                            supplier: p.supplier || '---',
+                                            date: p.date,
+                                            status: p.status,
+                                            amount: p.amount,
+                                            _original: p
+                                        }))}
                                         t={t}
                                         isRtl={isRtl}
-                                        onView={(purchase) => {
+                                        onEdit={(purchase) => {
                                             setSelectedPurchase(purchase);
                                             setPurchasesView('create');
                                         }}
-                                        onDelete={(purchase) => setPurchases(purchases.filter(p => p.id !== purchase.id))}
+                                        onDelete={handleDeletePurchase}
+                                        onPrint={(purchase) => {
+                                            setSelectedPurchase(purchase);
+                                            setPurchasesView('create');
+                                            setTimeout(() => window.print(), 500);
+                                        }}
+                                        dateRange={dateRange}
+                                        setDateRange={setDateRange}
                                     />
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1318,13 +1417,70 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                             t={t}
                                             isRtl={isRtl}
                                             initialData={selectedPurchase}
-                                            onSave={(newPurchase) => {
-                                                if (selectedPurchase) {
-                                                    setPurchases(purchases.map(p => p.id === newPurchase.id ? newPurchase : p));
-                                                } else {
-                                                    setPurchases([newPurchase, ...purchases]);
-                                                }
-                                                setPurchasesView('list');
+                                            inventory={inventory}
+                                            customers={customers}
+                                            settings={companySettings}
+                                            onSave={async (newPurchase) => {
+                                                try {
+                                                    const contact = customers.find(c => c.name === newPurchase.supplier);
+                                                    const invoiceData = {
+                                                        number: newPurchase.id,
+                                                        type: 'purchase',
+                                                        date: newPurchase.date,
+                                                        contact_id: contact?.id,
+                                                        total_amount: parseFloat(String(newPurchase.amount).replace(/[^0-9.-]+/g, '')),
+                                                        status: newPurchase.status || 'Paid'
+                                                    };
+
+                                                    let saved;
+                                                    if (selectedPurchase) {
+                                                        saved = await api.invoices.update(selectedPurchase.id, invoiceData);
+                                                    } else {
+                                                        saved = await api.invoices.create(invoiceData, (newPurchase.items || []).map(it => ({
+                                                            product_id: inventory.find(p => p.code === it.code)?.id,
+                                                            quantity: it.qty,
+                                                            price: parseFloat(it.price),
+                                                            total: parseFloat(it.price) * it.qty
+                                                        })));
+                                                    }
+
+                                                    // Update Inventory (Increase Stock)
+                                                    if (newPurchase.items) {
+                                                        const newInventory = [...inventory];
+                                                        await Promise.all(newPurchase.items.map(async item => {
+                                                            const product = inventory.find(p => p.code === item.code);
+                                                            if (product) {
+                                                                const newStock = (product.stock || 0) + item.qty;
+                                                                await api.products.update(product.id, { stock: newStock });
+                                                                const productIndex = newInventory.findIndex(p => p.id === product.id);
+                                                                newInventory[productIndex] = { ...product, stock: newStock };
+                                                            }
+                                                        }));
+                                                        setInventory(newInventory);
+                                                    }
+
+                                                    // Update Customer (Supplier) Balance
+                                                    if (contact) {
+                                                        const currentBalance = parseFloat(String(contact.balance || 0).replace(/[^0-9.-]+/g, '')) || 0;
+                                                        const invoiceAmount = parseFloat(String(newPurchase.amount).replace(/[^0-9.-]+/g, '')) || 0;
+                                                        const newBalance = currentBalance - invoiceAmount;
+                                                        await api.contacts.update(contact.id, { balance: newBalance });
+                                                        setCustomers(customers.map(c => c.id === contact.id ? { ...c, balance: newBalance } : c));
+                                                    }
+
+                                                    const mappedSaved = {
+                                                        ...saved,
+                                                        supplier: newPurchase.supplier,
+                                                        amount: fCurrency(saved.total_amount)
+                                                    };
+
+                                                    if (selectedPurchase) {
+                                                        setPurchases(purchases.map(p => p.id === saved.id ? mappedSaved : p));
+                                                    } else {
+                                                        setPurchases([mappedSaved, ...purchases]);
+                                                    }
+                                                    setPurchasesView('list');
+                                                } catch (e) { console.error(e); alert("Failed to save purchase"); }
                                             }}
                                         />
                                     </div>
@@ -1335,13 +1491,14 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                 <TreasuryView
                                     t={t}
                                     isRtl={isRtl}
-                                    transactions={treasury}
+                                    transactions={filteredTreasury}
                                     accounts={accounts}
+                                    fCurrency={fCurrency}
                                     onAdd={() => {
                                         setTransForm({ id: null, desc: '', amount: '', type: 'In', method: 'Cash', accountId: '' });
                                         setModalType('transaction');
                                     }}
-                                    onDelete={(tr) => setTreasury(treasury.filter(item => item.id !== tr.id))}
+                                    onDelete={handleDeleteTransaction}
                                     onEdit={(tr) => {
                                         setTransForm({
                                             id: tr.id,
@@ -1356,7 +1513,10 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                 />
                             )}
 
-                            {activeTab === 'inventory' && <InventoryView t={t} isRtl={isRtl} inventory={inventory} onAdd={() => setModalType('addProduct')} />}
+                            {activeTab === 'inventory' && <InventoryView t={t} isRtl={isRtl} inventory={inventory} onAdd={() => {
+                                setProductForm({ name: '', code: `PRD-${Math.floor(Math.random() * 1000)}`, barcode: '', category: '', unit: 'Piece', buy: '', sell: '', stock: '', minLimit: 5 });
+                                setModalType('addProduct');
+                            }} onEdit={handleEditProduct} onDelete={handleDeleteProduct} fCurrency={fCurrency} />}
                             {activeTab === 'customers' && (
                                 customersView === 'list' ? (
                                     <CustomersSuppliersView
@@ -1368,26 +1528,27 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                                             setContactForm({ ...contact, address: contact.location, balance: contact.balance.replace(/[^\d.-]/g, '') });
                                             setModalType('addContact');
                                         }}
-                                        onDelete={(contact) => setCustomers(customers.filter(c => c.name !== contact.name))}
+                                        onDelete={handleDeleteContact}
                                         onViewStatement={(contact) => { setSelectedContact(contact); setCustomersView('statement'); }}
                                     />
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                                         <button onClick={() => setCustomersView('list')} style={{ alignSelf: 'start', background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px' }}>← {t.previous}</button>
-                                        <AccountStatementView t={t} isRtl={isRtl} contact={selectedContact} />
+                                        <AccountStatementView t={t} isRtl={isRtl} contact={selectedContact} dateRange={dateRange} />
                                     </div>
                                 )
                             )}
 
-                            {activeTab === 'reports' && <ReportsView t={t} isRtl={isRtl} />}
-                            {activeTab === 'settings' && <SettingsView t={t} isRtl={isRtl} />}
+                            {activeTab === 'reports' && <ReportsView t={t} isRtl={isRtl} sales={filteredSales} purchases={filteredPurchases} expenses={filteredTreasury.filter(t => t.type === 'Cash Out' || t.type === 'مصاريف')} inventory={inventory} treasury={filteredTreasury} fCurrency={fCurrency} dateRange={dateRange} setDateRange={setDateRange} />}
+                            {activeTab === 'settings' && <SettingsView t={t} isRtl={isRtl} settings={companySettings} onSave={setCompanySettings} />}
                             {activeTab === 'chart' && (
                                 <ChartOfAccountsView
                                     t={t}
                                     isRtl={isRtl}
                                     onAdd={() => { setAccountForm({ code: '', name: '', type: 'Asset', parent: '', balance: '0' }); setModalType('addAccount'); }}
                                     accounts={accounts}
-                                    onDelete={(acc) => setAccounts(accounts.filter(a => a.code !== acc.code))}
+                                    onDelete={handleDeleteAccount}
+                                    fCurrency={fCurrency}
                                 />
                             )}
                         </motion.div>
@@ -1395,7 +1556,7 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
                 </main>
             </div>
 
-            <Modal isOpen={!!modalType} onClose={() => setModalType(null)} title={t[modalType] || t.save} isRtl={isRtl}>
+            <Modal isOpen={!!modalType} onClose={() => setModalType(null)} title={(t && modalType && t[modalType]) || (t && t.save) || "Save"} isRtl={isRtl}>
                 {(modalType === 'sale' || modalType === 'purchase') && (
                     <>
                         <div style={{ display: 'flex', gap: '20px' }}>
@@ -1545,17 +1706,23 @@ const AuthenticatedApp = ({ lang, setLang, onLogout }) => {
 };
 
 // Supporting Components (Header, StatCard, etc from previous version)
-const Header = ({ lang, setLang, t, isRtl }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', marginBottom: '16px' }}>
-        <div className="glass" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 16px', width: '350px' }}>
-            <Search size={18} color="#94a3b8" />
-            <input placeholder={t.searchPlaceholder} style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%' }} />
+const Header = ({ lang, setLang, t, isRtl, settings }) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', marginBottom: '16px', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+            <div className="glass" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 16px', width: '300px' }}>
+                <Search size={18} color="#94a3b8" />
+                <input placeholder={t.searchPlaceholder} style={{ background: 'transparent', border: 'none', color: 'white', outline: 'none', width: '100%' }} />
+            </div>
         </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <button onClick={() => setLang(lang === 'en' ? 'ar' : lang === 'ar' ? 'fr' : 'en')} className="glass" style={{ padding: '8px 16px', color: '#38bdf8', fontWeight: '700' }}>{t.languageName}</button>
             <Bell className="text-gray-400" size={20} />
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ textAlign: isRtl ? 'left' : 'right' }}><p style={{ fontWeight: '700', fontSize: '13px' }}>Ilyas Accountant</p><p style={{ fontSize: '11px', color: '#94a3b8' }}>{t.admin}</p></div>
+                <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
+                    <p style={{ fontWeight: '700', fontSize: '13px' }}>{settings?.name || "Ilyas Accountant"}</p>
+                    <p style={{ fontSize: '11px', color: '#94a3b8' }}>{t.admin}</p>
+                </div>
                 <div style={{ width: '35px', height: '35px', borderRadius: '50%', background: 'linear-gradient(45deg, #1e293b, #334155)' }}></div>
             </div>
         </div>
@@ -1575,28 +1742,58 @@ const StatCard = ({ title, value, change, trend, icon: Icon, chartData, index })
     </motion.div>
 );
 
-const DashboardView = ({ t, isRtl, onAddInvoice, invoices, customers }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
-            <StatCard index={0} title={t.totalRevenue} value="DA 1,240,000" change="+12%" trend="up" icon={TrendingUp} />
-            <StatCard index={1} title={t.purchases} value="DA 450,000" change="+5%" trend="down" icon={ShoppingCart} />
-            <StatCard index={2} title={t.customersSuppliers} value={customers.length} change="+8%" trend="up" icon={Users} />
-            <StatCard index={3} title={t.netProfit} value="DA 790,000" change="+15%" trend="up" icon={ArrowUpRight} />
+const DateFilterBar = null; // Replaced by Header integration
+
+const DashboardView = ({ t, isRtl, onAddInvoice, sales, purchases, customers, fCurrency }) => {
+    const totalRev = sales.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+    const totalPur = purchases.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+    const profit = totalRev - totalPur;
+
+    // Chart Data logic
+    const chartData = [
+        { name: 'Revenue', value: totalRev },
+        { name: 'Expenses', value: totalPur }
+    ];
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                    <h2 style={{ fontSize: '28px', fontWeight: '800', color: 'white', marginBottom: '4px' }}>{t.overview}</h2>
+                    <p style={{ color: '#94a3b8', fontSize: '14px' }}>{t.welcomeBack}</p>
+                </div>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={onAddInvoice}
+                    style={{ background: 'linear-gradient(135deg, #38bdf8, #1d4ed8)', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '14px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 10px 20px rgba(56, 189, 248, 0.2)' }}
+                >
+                    <Plus size={20} /> {t.newInvoiceShort}
+                </motion.button>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+                <StatCard index={0} title={t.totalRevenue} value={fCurrency(totalRev)} change="+100%" trend="up" icon={TrendingUp} />
+                <StatCard index={1} title={t.purchases} value={fCurrency(totalPur)} change="+100%" trend="down" icon={ShoppingCart} />
+                <StatCard index={2} title={t.customersSuppliers} value={customers.length} change="+0%" trend="up" icon={Users} />
+                <StatCard index={3} title={t.netProfit} value={fCurrency(profit)} change="+100%" trend="up" icon={ArrowUpRight} />
+            </div>
+
+            <div className="glass" style={{ padding: '24px', height: '350px' }}>
+                <h3 style={{ marginBottom: '20px' }}>{t.revenueAnalytics}</h3>
+                <ResponsiveContainer width="100%" height="85%">
+                    <AreaChart data={chartData.length > 0 ? chartData : [{ name: 'N/A', value: 0 }]}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                        <XAxis dataKey="name" stroke="#94a3b8" />
+                        <YAxis stroke="#94a3b8" />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="value" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.2)" />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
         </div>
-        <div className="glass" style={{ padding: '24px', height: '350px' }}>
-            <h3 style={{ marginBottom: '20px' }}>{t.revenueAnalytics}</h3>
-            <ResponsiveContainer width="100%" height="85%">
-                <AreaChart data={[{ name: 'Jan', v: 4000 }, { name: 'Feb', v: 3000 }, { name: 'Mar', v: 5000 }, { name: 'Apr', v: 2780 }]}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="name" stroke="#94a3b8" />
-                    <YAxis stroke="#94a3b8" />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="v" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.2)" />
-                </AreaChart>
-            </ResponsiveContainer>
-        </div>
-    </div>
-);
+    );
+};
 
 /* Placeholder for Account Statement used in Treasury */
 const AccountStatementView = ({ t, isRtl }) => {
@@ -1678,19 +1875,85 @@ const AccountStatementView = ({ t, isRtl }) => {
     );
 };
 
-const ReportsView = ({ t, isRtl }) => {
+const ReportsView = ({ t, isRtl, sales = [], purchases = [], expenses = [], inventory = [], treasury = [], fCurrency, dateRange, setDateRange }) => {
     const [activeSubTab, setActiveSubTab] = useState('incomeStatement');
+
+    // Calculations
+    const totalRevenue = sales.reduce((acc, sale) => acc + (typeof sale.total === 'number' ? sale.total : parseFloat(String(sale.total || '0').replace(/[^0-9.-]+/g, ''))), 0);
+
+    // Cost of goods sold (simplified estimate based on purchases for now, ideally per item margin)
+    // For a more accurate COGS in real apps, we'd track specific batch costs. Here we'll sum purchase invoices or assume a margin.
+    // Let's use the 'buyPrice' of sold items if available in sales history, else fallback to total purchases for the period.
+    // Since 'sales' structure in this mock doesn't detailed items with buy prices easily accessible without deep dive, 
+    // we will use Total Purchases as a proxy for COGS for this period (Cash Basis Accounting style) or just hardcode a simpler margin if preferred.
+    // Better approach for this MVP: Sum of (Item Buy Price * Qty) from Sales if we had that detail preserved safely.
+    // Let's use Total Purchases as "Cost of Sales" for now as it's common in simple cash-basis systems.
+    const costOfSales = purchases.reduce((acc, p) => acc + (typeof p.total === 'number' ? p.total : parseFloat(String(p.total || '0').replace(/[^0-9.-]+/g, ''))), 0);
+
+    const grossProfit = totalRevenue - costOfSales;
+
+    const operatingExpenses = expenses.reduce((acc, exp) => acc + (typeof exp.anim === 'number' ? exp.anim : parseFloat(String(exp.anim || '0').replace(/[^0-9.-]+/g, ''))), 0);
+
+    const netProfit = grossProfit - operatingExpenses;
+
+    const stockValue = inventory.reduce((acc, i) => {
+        const bp = typeof i.buyPrice === 'number' ? i.buyPrice : parseFloat(String(i.buyPrice || '0').replace(/[^0-9.-]+/g, ''));
+        return acc + (bp * (i.stock || 0));
+    }, 0);
+    const cashOnHand = treasury.reduce((acc, tr) => {
+        const amt = typeof tr.anim === 'number' ? tr.anim : parseFloat(String(tr.anim || '0').replace(/[^0-9.-]+/g, ''));
+        return tr.type === 'Cash In' || tr.type === 'قبض' ? acc + amt : acc - amt;
+    }, 0);
+
+    // Placeholder for liabilities (e.g. unpaid supplier invoices)
+    const liabilities = purchases.filter(p => p.status === 'Pending').reduce((acc, p) => acc + (typeof p.total === 'number' ? p.total : parseFloat(String(p.total || '0').replace(/[^0-9.-]+/g, ''))), 0);
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: '12px', order: isRtl ? 2 : 1 }}>
-                    <button className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#94a3b8' }} onClick={() => window.print()}><Printer size={18} /> {t.printing}</button>
-                    <button onClick={() => {
-                        // PDF Generation Logic (Same as before)
-                        const title = t[activeSubTab] || "Financial Report";
-                        generateReportPDF(title, ["Item", "Amount"], [], t); // Placeholder data for now
-                    }} className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#94a3b8' }}><Download size={18} /> {t.downloadPDF}</button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '12px', order: isRtl ? 2 : 1 }}>
+                        <button className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#94a3b8' }} onClick={() => window.print()}><Printer size={18} /> {t.printing}</button>
+                        <button onClick={() => {
+                            const title = t[activeSubTab] || "Financial Report";
+                            // Generate simple PDF data
+                            const reportData = [
+                                { label: t.revenue, value: fCurrency(totalRevenue) },
+                                { label: t.costOfSales, value: fCurrency(costOfSales) },
+                                { label: t.formattedGrossProfit, value: fCurrency(grossProfit) },
+                                { label: t.formattedNetProfit, value: fCurrency(netProfit) }
+                            ];
+                            generateReportPDF(title, ["Item", "Amount"], reportData.map(r => [r.label, r.value]), t);
+                        }} className="glass" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', color: '#94a3b8' }}><Download size={18} /> {t.downloadPDF}</button>
+                    </div>
+
+                    {dateRange && setDateRange && (
+                        <div className="glass" style={{ display: 'flex', gap: '15px', padding: '8px 16px', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8' }}>
+                                <Calendar size={16} />
+                            </div>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: '#64748b' }}>{t.fromDate}:</span>
+                                    <input
+                                        type="date"
+                                        value={dateRange.start}
+                                        onChange={e => setDateRange({ ...dateRange, start: e.target.value })}
+                                        style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', outline: 'none' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: '#64748b' }}>{t.toDate}:</span>
+                                    <input
+                                        type="date"
+                                        value={dateRange.end}
+                                        onChange={e => setDateRange({ ...dateRange, end: e.target.value })}
+                                        style={{ background: 'transparent', border: 'none', color: 'white', fontSize: '12px', outline: 'none' }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ order: isRtl ? 1 : 2, textAlign: isRtl ? 'left' : 'right' }}>
@@ -1700,21 +1963,9 @@ const ReportsView = ({ t, isRtl }) => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px', justifyContent: 'flex-end' }}>
-                {['trialBalance', 'incomeStatement', 'balanceSheet', 'salesReport', 'purchaseReport'].map(tab => (
+                {['incomeStatement', 'balanceSheet'].map(tab => (
                     <button key={tab} onClick={() => setActiveSubTab(tab)} style={{ padding: '8px 20px', borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', background: activeSubTab === tab ? '#1d4ed8' : 'rgba(255,255,255,0.03)', color: activeSubTab === tab ? 'white' : '#94a3b8' }}>{t[tab]}</button>
                 ))}
-            </div>
-
-            {/* Date Filters */}
-            <div className="glass" style={{ padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>From Date</span>
-                    <input type="date" className="glass" style={{ padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', background: 'transparent' }} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>To Date</span>
-                    <input type="date" className="glass" style={{ padding: '8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', color: 'white', background: 'transparent' }} />
-                </div>
             </div>
 
             <div className="glass" style={{ padding: '24px' }}>
@@ -1728,7 +1979,7 @@ const ReportsView = ({ t, isRtl }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#dcfce7', borderRadius: '8px', alignItems: 'center' }}>
                             <span style={{ color: '#166534', fontWeight: '700', fontSize: '14px' }}>{t.revenue}</span>
                             <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
-                                <strong style={{ fontSize: '24px', color: '#166534', display: 'block' }}>93,150 DA</strong>
+                                <strong style={{ fontSize: '24px', color: '#166534', display: 'block' }}>{fCurrency(totalRevenue)}</strong>
                             </div>
                         </div>
 
@@ -1736,7 +1987,7 @@ const ReportsView = ({ t, isRtl }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#fee2e2', borderRadius: '8px', alignItems: 'center' }}>
                             <span style={{ color: '#991b1b', fontWeight: '700', fontSize: '14px' }}>{t.costOfSales}</span>
                             <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
-                                <strong style={{ fontSize: '24px', color: '#991b1b', display: 'block' }}>4,025 DA</strong>
+                                <strong style={{ fontSize: '24px', color: '#991b1b', display: 'block' }}>{fCurrency(costOfSales)}</strong>
                             </div>
                         </div>
 
@@ -1744,7 +1995,7 @@ const ReportsView = ({ t, isRtl }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#e0f2fe', borderRadius: '8px', alignItems: 'center' }}>
                             <span style={{ color: '#075985', fontWeight: '700', fontSize: '14px' }}>{t.grossProfit || "Gross Profit"}</span>
                             <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
-                                <strong style={{ fontSize: '24px', color: '#075985', display: 'block' }}>89,125 DA</strong>
+                                <strong style={{ fontSize: '24px', color: '#075985', display: 'block' }}>{fCurrency(grossProfit)}</strong>
                             </div>
                         </div>
 
@@ -1752,7 +2003,7 @@ const ReportsView = ({ t, isRtl }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#ffedd5', borderRadius: '8px', alignItems: 'center' }}>
                             <span style={{ color: '#9a3412', fontWeight: '700', fontSize: '14px' }}>{t.operatingExpenses || "Operating Expenses (-)"}</span>
                             <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
-                                <strong style={{ fontSize: '24px', color: '#9a3412', display: 'block' }}>0 DA</strong>
+                                <strong style={{ fontSize: '24px', color: '#9a3412', display: 'block' }}>{fCurrency(operatingExpenses)}</strong>
                             </div>
                         </div>
 
@@ -1760,24 +2011,24 @@ const ReportsView = ({ t, isRtl }) => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '25px', background: '#dcfce7', borderRadius: '8px', alignItems: 'center', marginTop: '10px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
                             <span style={{ color: '#15803d', fontWeight: '800', fontSize: '16px' }}>{t.netProfit}</span>
                             <div style={{ textAlign: isRtl ? 'left' : 'right' }}>
-                                <strong style={{ fontSize: '28px', color: '#15803d', display: 'block' }}>89,125 DA</strong>
+                                <strong style={{ fontSize: '28px', color: '#15803d', display: 'block' }}>{fCurrency(netProfit)}</strong>
                             </div>
                         </div>
                     </div>
                 )}
                 {activeSubTab === 'balanceSheet' && (
-                    <div style={{ display: 'flex', gap: '40px' }}>
-                        <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: '300px' }}>
                             <h4 style={{ color: '#38bdf8', marginBottom: '16px' }}>{t.assets}</h4>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.stock}</span><span style={{ fontWeight: '700' }}>502,500</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.cash}</span><span style={{ fontWeight: '700' }}>15,000</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '8px', marginTop: '16px' }}><strong>{t.totalAssets}</strong><strong>517,500</strong></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.stock}</span><span style={{ fontWeight: '700' }}>{fCurrency(stockValue)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.cash}</span><span style={{ fontWeight: '700' }}>{fCurrency(cashOnHand)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '8px', marginTop: '16px' }}><strong>{t.totalAssets}</strong><strong>{fCurrency(stockValue + cashOnHand)}</strong></div>
                         </div>
-                        <div style={{ flex: 1 }}>
+                        <div style={{ flex: 1, minWidth: '300px' }}>
                             <h4 style={{ color: '#ef4444', marginBottom: '16px' }}>{t.liabilities}</h4>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.customersSuppliers}</span><span style={{ fontWeight: '700' }}>250,000</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.netProfit}</span><span style={{ fontWeight: '700', color: '#22c55e' }}>89,125</span></div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', marginTop: '16px' }}><strong>{t.totalLiabilities}</strong><strong>339,125</strong></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.customersSuppliers}</span><span style={{ fontWeight: '700' }}>{fCurrency(liabilities)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>{t.netProfit}</span><span style={{ fontWeight: '700', color: '#22c55e' }}>{fCurrency(netProfit)}</span></div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', marginTop: '16px' }}><strong>{t.totalLiabilities}</strong><strong>{fCurrency(liabilities + netProfit)}</strong></div>
                         </div>
                     </div>
                 )}
@@ -1786,23 +2037,77 @@ const ReportsView = ({ t, isRtl }) => {
     );
 };
 
-const SettingsView = ({ t, isRtl }) => {
+const SettingsView = ({ t, isRtl, settings, onSave }) => {
+    const [localSettings, setLocalSettings] = useState(settings);
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div>
                 <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{t.settings}</h2>
-                <p style={{ color: '#94a3b8', fontSize: '14px' }}>Manage your application preferences</p>
+                <p style={{ color: '#94a3b8', fontSize: '14px' }}>{t.manageSettings || "Manage your application preferences"}</p>
             </div>
 
             <div className="glass" style={{ padding: '24px', maxWidth: '600px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>General Settings</h3>
-                <FormInput label="Company Name" value="Ilyas Accountant" onChange={() => { }} isRtl={isRtl} />
-                <FormInput label="Email" value="admin@ilyas.com" onChange={() => { }} isRtl={isRtl} />
+                <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>{t.companyData}</h3>
+                <FormInput
+                    label={t.companyNameEn || "Company Name"}
+                    value={localSettings.name}
+                    onChange={(v) => setLocalSettings({ ...localSettings, name: v })}
+                    isRtl={isRtl}
+                />
+                <FormInput
+                    label={t.email}
+                    value={localSettings.email}
+                    onChange={(v) => setLocalSettings({ ...localSettings, email: v })}
+                    isRtl={isRtl}
+                />
                 <div style={{ display: 'flex', gap: '20px' }}>
-                    <FormInput half label="Currency" value="DA" onChange={() => { }} isRtl={isRtl} />
-                    <FormInput half label="Language" type="select" options={[{ label: 'English', value: 'en' }, { label: 'Français', value: 'fr' }, { label: 'العربية', value: 'ar' }]} isRtl={isRtl} />
+                    <FormInput
+                        half
+                        label={t.phone}
+                        value={localSettings.phone}
+                        onChange={(v) => setLocalSettings({ ...localSettings, phone: v })}
+                        isRtl={isRtl}
+                    />
+                    <FormInput
+                        half
+                        label={t.taxNumber}
+                        value={localSettings.taxNumber}
+                        onChange={(v) => setLocalSettings({ ...localSettings, taxNumber: v })}
+                        isRtl={isRtl}
+                    />
                 </div>
-                <button className="glass sidebar-active" style={{ padding: '12px 24px', border: 'none', cursor: 'pointer', fontWeight: '700', marginTop: '12px' }}>{t.save}</button>
+                <div style={{ display: 'flex', gap: '20px' }}>
+                    <FormInput
+                        half
+                        label={t.address}
+                        value={localSettings.address}
+                        onChange={(v) => setLocalSettings({ ...localSettings, address: v })}
+                        isRtl={isRtl}
+                    />
+                    <FormInput
+                        half
+                        label={t.currency || "Currency"}
+                        value={localSettings.currency}
+                        onChange={(v) => setLocalSettings({ ...localSettings, currency: v })}
+                        isRtl={isRtl}
+                    />
+                </div>
+                <button
+                    onClick={() => {
+                        try {
+                            onSave(localSettings);
+                            alert(t.saveChanges || "Settings saved successfully!");
+                        } catch (err) {
+                            console.error("Save error:", err);
+                            alert("Error saving settings.");
+                        }
+                    }}
+                    className="glass sidebar-active"
+                    style={{ padding: '12px 24px', border: 'none', cursor: 'pointer', fontWeight: '700', marginTop: '12px' }}
+                >
+                    {t.save}
+                </button>
             </div>
         </div>
     );
@@ -1823,7 +2128,7 @@ const App = () => {
     }, [lang, isRtl]);
 
     if (!isLoggedIn) {
-        return <LoginView t={t} isRtl={isRtl} onLogin={() => setIsLoggedIn(true)} />;
+        return <LoginView t={t} isRtl={isRtl} onLogin={() => setIsLoggedIn(true)} lang={lang} />;
     }
 
     return <AuthenticatedApp lang={lang} setLang={setLang} onLogout={() => setIsLoggedIn(false)} />;

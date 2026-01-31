@@ -1,6 +1,6 @@
 export const formatCurrency = (amount, currency = 'DA') => {
     if (amount === null || amount === undefined || amount === '') return '';
     const num = typeof amount === 'string' ? parseFloat(amount.replace(/[^0-9.-]+/g, '')) : amount;
-    if (isNaN(num)) return amount; // Fallback if parsing fails
+    if (isNaN(num)) return `${currency} 0.00`; // Fallback to 0 if parsing fails
     return `${currency} ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };

@@ -126,6 +126,8 @@ const translations = {
         clientData: "Client Info",
         printing: "Print",
         newInvoiceShort: "Invoice",
+        addProductsError: "Please add products to the invoice",
+        salesSubtitle: "Manage and track your sales invoices",
         deleteItem: "Delete",
         code: "Code",
         barcode: "Barcode",
@@ -161,7 +163,14 @@ const translations = {
         password: "Password",
         loginButton: "Sign In",
         forgotPassword: "Forgot Password?",
-        logout: "Logout"
+        edit: "Edit",
+        delete: "Delete",
+        view: "View",
+        print: "Print",
+        logout: "Logout",
+        fromDate: "From Date",
+        toDate: "To Date",
+        filter: "Filter"
     },
     ar: {
         appName: "سكاي أكاونت",
@@ -290,6 +299,8 @@ const translations = {
         clientData: "بيانات العميل",
         printing: "طباعة",
         newInvoiceShort: "فاتورة",
+        addProductsError: "يرجى إضافة منتجات إلى الفاتورة",
+        salesSubtitle: "إدارة ومتابعة فواتير المبيعات",
         deleteItem: "حذف",
         code: "الكود",
         barcode: "الباركود",
@@ -324,8 +335,15 @@ const translations = {
         loginSubtitle: "مرحباً بك مجدداً! الرجاء إدخال بياناتك.",
         password: "كلمة المرور",
         loginButton: "دخول",
-        forgotPassword: "نسيت كلمة المرور؟",
-        logout: "تسجيل الخروج"
+        forgotPassword: "هل نسيت كلمة المرور؟",
+        edit: "تعديل",
+        delete: "حذف",
+        view: "عرض",
+        print: "طباعة",
+        logout: "تسجيل الخروج",
+        fromDate: "من تاريخ",
+        toDate: "إلى تاريخ",
+        filter: "تصفية"
     },
     fr: {
         appName: "SkyAccount",
@@ -499,7 +517,14 @@ const translations = {
         password: "Mot de passe",
         loginButton: "Se connecter",
         forgotPassword: "Mot de passe oublié ?",
-        logout: "Déconnexion"
+        edit: "Modifier",
+        delete: "Supprimer",
+        view: "Voir",
+        print: "Imprimer",
+        logout: "Déconnexion",
+        fromDate: "Date Début",
+        toDate: "Date Fin",
+        filter: "Filtrer"
     }
 };
 

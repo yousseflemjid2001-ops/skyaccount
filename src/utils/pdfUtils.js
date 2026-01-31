@@ -1,20 +1,23 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-export const generateInvoicePDF = (invoiceData, t) => {
+export const generateInvoicePDF = (invoiceData, t, settings = {}) => {
     const doc = new jsPDF();
     const isRtl = false; // Simplify PDF to LTR for standard fonts compatibility initially
 
     // Company Header
     doc.setFontSize(22);
     doc.setTextColor(56, 189, 248); // Sky Blue
-    doc.text("SkyAccount", 20, 20);
+    doc.text(settings.name || "SkyAccount", 20, 20);
 
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text("123 Business Street, Tech City", 20, 28);
-    doc.text("Phone: +1 234 567 890", 20, 33);
-    doc.text("Email: admin@skyaccount.com", 20, 38);
+    doc.text(settings.address || "123 Business Street, Tech City", 20, 28);
+    doc.text(`Phone: ${settings.phone || "+1 234 567 890"}`, 20, 33);
+    doc.text(`Email: ${settings.email || "admin@skyaccount.com"}`, 20, 38);
+    if (settings.taxNumber) {
+        doc.text(`Tax ID: ${settings.taxNumber}`, 20, 43);
+    }
 
     // Invoice Info (Right side)
     doc.setFontSize(16);
