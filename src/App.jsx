@@ -951,9 +951,6 @@ const LoginView = ({ t, isRtl, onLogin, lang }) => {
                             <label htmlFor="remember" style={{ fontSize: '14px', color: '#94a3b8', cursor: 'pointer' }}>{lang === 'ar' ? "تذكرني" : "Se souvenir de moi"}</label>
                         </div>
 
-                            </div>
-                        </div>
-
                         <div style={{
                             marginTop: '8px',
                             padding: '12px 16px',
@@ -987,16 +984,16 @@ const LoginView = ({ t, isRtl, onLogin, lang }) => {
                         >
                             {t.loginButton}
                         </motion.button>
-                    </form >
+                    </form>
 
-    <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
-        {lang === 'fr' ? "Besoin d'aide ?" : lang === 'ar' ? "تحتاج مساعدة؟" : "Need help?"} <a href="#" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '700' }}>{lang === 'ar' ? "تواصل معي" : "Contactez le support"}</a>
-    </p>
-                </div >
-            </motion.div >
+                    <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
+                        {lang === 'fr' ? "Besoin d'aide ?" : lang === 'ar' ? "تحتاج مساعدة؟" : "Need help?"} <a href="#" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '700' }}>{lang === 'ar' ? "تواصل معي" : "Contactez le support"}</a>
+                    </p>
+                </div>
+            </motion.div>
 
-    <style>{`.login-input:focus { border-color: #38bdf8 !important; background: rgba(56, 189, 248, 0.05) !important; }`}</style>
-        </div >
+            <style>{`.login-input:focus { border-color: #38bdf8 !important; background: rgba(56, 189, 248, 0.05) !important; }`}</style>
+        </div>
     );
 };
 
