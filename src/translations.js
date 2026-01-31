@@ -170,7 +170,8 @@ const translations = {
         logout: "Logout",
         fromDate: "From Date",
         toDate: "To Date",
-        filter: "Filter"
+        filter: "Filter",
+        invalidCredentials: "Invalid email or password"
     },
     ar: {
         appName: "سكاي أكاونت",
@@ -343,7 +344,8 @@ const translations = {
         logout: "تسجيل الخروج",
         fromDate: "من تاريخ",
         toDate: "إلى تاريخ",
-        filter: "تصفية"
+        filter: "تصفية",
+        invalidCredentials: "البريد الإلكتروني أو كلمة المرور غير صحيحة"
     },
     fr: {
         appName: "SkyAccount",
@@ -524,7 +526,7 @@ const translations = {
         logout: "Déconnexion",
         fromDate: "Date Début",
         toDate: "Date Fin",
-        filter: "Filtrer"
+        filter: "Filtrer",
     }
 };
 

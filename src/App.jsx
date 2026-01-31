@@ -785,10 +785,16 @@ const CustomersSuppliersView = ({ t, isRtl, contacts, onAdd, onEdit, onDelete, o
 const LoginView = ({ t, isRtl, onLogin, lang }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onLogin();
+        setError('');
+        if (email === 'admin@gmail.com' && password === '123456789') {
+            onLogin();
+        } else {
+            setError(t.invalidCredentials);
+        }
     };
 
     return (
@@ -870,6 +876,26 @@ const LoginView = ({ t, isRtl, onLogin, lang }) => {
                         <p style={{ color: '#64748b', fontSize: '15px' }}>{t.loginSubtitle}</p>
                     </div>
 
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            style={{
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                color: '#ef4444',
+                                fontSize: '14px',
+                                marginBottom: '24px',
+                                fontWeight: '600',
+                                textAlign: 'center'
+                            }}
+                        >
+                            {error}
+                        </motion.div>
+                    )}
+
                     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                         <div>
                             <label style={{ display: 'block', marginBottom: '10px', fontSize: '14px', color: '#cbd5e1', fontWeight: '600' }}>{t.email}</label>
@@ -925,6 +951,29 @@ const LoginView = ({ t, isRtl, onLogin, lang }) => {
                             <label htmlFor="remember" style={{ fontSize: '14px', color: '#94a3b8', cursor: 'pointer' }}>{lang === 'ar' ? "تذكرني" : "Se souvenir de moi"}</label>
                         </div>
 
+                            </div>
+                        </div>
+
+                        <div style={{
+                            marginTop: '8px',
+                            padding: '12px 16px',
+                            borderRadius: '12px',
+                            background: 'rgba(56, 189, 248, 0.05)',
+                            border: '1px solid rgba(56, 189, 248, 0.1)',
+                            fontSize: '13px',
+                            color: '#94a3b8',
+                            lineHeight: 1.5
+                        }}>
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+                                <span style={{ color: '#38bdf8', fontWeight: '600' }}>Email:</span>
+                                <span style={{ color: 'white' }}>admin@gmail.com</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <span style={{ color: '#38bdf8', fontWeight: '600' }}>{t.password}:</span>
+                                <span style={{ color: 'white' }}>123456789</span>
+                            </div>
+                        </div>
+
                         <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
@@ -938,16 +987,16 @@ const LoginView = ({ t, isRtl, onLogin, lang }) => {
                         >
                             {t.loginButton}
                         </motion.button>
-                    </form>
+                    </form >
 
-                    <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
-                        {lang === 'fr' ? "Besoin d'aide ?" : lang === 'ar' ? "تحتاج مساعدة؟" : "Need help?"} <a href="#" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '700' }}>{lang === 'ar' ? "تواصل معي" : "Contactez le support"}</a>
-                    </p>
-                </div>
-            </motion.div>
+    <p style={{ textAlign: 'center', marginTop: '32px', fontSize: '14px', color: '#64748b' }}>
+        {lang === 'fr' ? "Besoin d'aide ?" : lang === 'ar' ? "تحتاج مساعدة؟" : "Need help?"} <a href="#" style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: '700' }}>{lang === 'ar' ? "تواصل معي" : "Contactez le support"}</a>
+    </p>
+                </div >
+            </motion.div >
 
-            <style>{`.login-input:focus { border-color: #38bdf8 !important; background: rgba(56, 189, 248, 0.05) !important; }`}</style>
-        </div>
+    <style>{`.login-input:focus { border-color: #38bdf8 !important; background: rgba(56, 189, 248, 0.05) !important; }`}</style>
+        </div >
     );
 };
 
